@@ -86,7 +86,7 @@ radar_feat_dim = 18
 
 # ABLATION 1
 # BEV compression -> Change the z_grid size above from 1 to >1 (either 8, 10)
-bev_compression = True
+bev_compression = False
 
 if bev_compression:
     numC_Trans_Fused = numC_Trans
@@ -137,7 +137,7 @@ else:
 
 # ABLATION 2
 # late fusion
-late_fusion = False
+late_fusion = True
 if late_fusion:
     late_fusion_dim = 256 + radar_feat_dim*radar_z_num_cells
 else:
@@ -262,8 +262,8 @@ data_root_pkl = 'data/nuscenes_out/'
 file_client_args = dict(backend='disk')
 
 #For mini uncomment this
-# data_root = 'data/nuscenes_mini/mini/'
-# data_root_pkl = 'data/nuscenes_mini/'
+data_root = 'data/nuscenes_mini/mini/'
+data_root_pkl = 'data/nuscenes_mini/'
 
 bda_aug_conf = dict(
     rot_lim=(-22.5, 22.5),
