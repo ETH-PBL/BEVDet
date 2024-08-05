@@ -894,8 +894,9 @@ class ObjectRangeFilter(object):
         point_cloud_range (list[float]): Point cloud range.
     """
 
-    def __init__(self, point_cloud_range):
+    def __init__(self, point_cloud_range, qd_tracking=False):
         self.pcd_range = np.array(point_cloud_range, dtype=np.float32)
+        self.qd_tracking = qd_tracking
 
     def __call__(self, input_dict):
         """Call function to filter objects by the range.
@@ -916,6 +917,13 @@ class ObjectRangeFilter(object):
 
         gt_bboxes_3d = input_dict['gt_bboxes_3d']
         gt_labels_3d = input_dict['gt_labels_3d']
+
+        # list keys of input dict
+        keys = input_dict.keys()
+        print(f"keys: {keys}", file=open("debug.txt", "a"))
+
+        if self.qd_tracking:
+            gt_match_indices = input_dict['gt_match_indices']
         mask = gt_bboxes_3d.in_range_bev(bev_range)
         gt_bboxes_3d = gt_bboxes_3d[mask]
         # mask is a torch tensor but gt_labels_3d is still numpy array
@@ -923,11 +931,47 @@ class ObjectRangeFilter(object):
         # len(gt_labels_3d) == 1, where mask=1 will be interpreted
         # as gt_labels_3d[1] and cause out of index error
         gt_labels_3d = gt_labels_3d[mask.numpy().astype(np.bool)]
+        if self.qd_tracking:
+            gt_match_indices = gt_match_indices[mask.numpy().astype(np.bool)]
 
         # limit rad to [-pi, pi]
         gt_bboxes_3d.limit_yaw(offset=0.5, period=2 * np.pi)
         input_dict['gt_bboxes_3d'] = gt_bboxes_3d
         input_dict['gt_labels_3d'] = gt_labels_3d
+        if self.qd_tracking:
+            input_dict['gt_match_indices'] = gt_match_indices
+
+        if 'gt_bboxes_3d_ref' in input_dict:
+            # filter key instance ids
+            # print(f"instance ids key type {type(input_dict['instance_ids_key'])} gt_match type {type(gt_match_indices)}", file=open("debug.txt", "a"))
+            inst_id_key = np.array(input_dict['instance_ids_key'])
+            input_dict['instance_ids_key'] = inst_id_key[mask.numpy().astype(np.bool)]  
+
+
+            # Check points instance type and initialise bev_range
+            if isinstance(input_dict['gt_bboxes_3d_ref'],
+                        (LiDARInstance3DBoxes, DepthInstance3DBoxes)):
+                bev_range = self.pcd_range[[0, 1, 3, 4]]
+            elif isinstance(input_dict['gt_bboxes_3d_ref'], CameraInstance3DBoxes):
+                bev_range = self.pcd_range[[0, 2, 3, 5]]
+
+            gt_bboxes_3d_ref = input_dict['gt_bboxes_3d_ref']
+            gt_labels_3d_ref = input_dict['gt_labels_3d_ref']
+            mask = gt_bboxes_3d_ref.in_range_bev(bev_range)
+            gt_bboxes_3d_ref = gt_bboxes_3d_ref[mask]
+            # mask is a torch tensor but gt_labels_3d_ref is still numpy array
+            # using mask to index gt_labels_3d_ref will cause bug when
+            # len(gt_labels_3d_ref) == 1, where mask=1 will be interpreted
+            # as gt_labels_3d_ref[1] and cause out of index error
+            gt_labels_3d_ref = gt_labels_3d_ref[mask.numpy().astype(np.bool)]
+            # filter ref instance ids
+            inst_id_ref = np.array(input_dict['instance_ids_ref'])
+            input_dict['instance_ids_ref'] = inst_id_ref[mask.numpy().astype(np.bool)]
+
+            # limit rad to [-pi, pi]
+            gt_bboxes_3d_ref.limit_yaw(offset=0.5, period=2 * np.pi)
+            input_dict['gt_bboxes_3d_ref'] = gt_bboxes_3d_ref
+            input_dict['gt_labels_3d_ref'] = gt_labels_3d_ref
 
         return input_dict
 
@@ -991,9 +1035,10 @@ class ObjectNameFilter(object):
         classes (list[str]): List of class names to be kept for training.
     """
 
-    def __init__(self, classes):
+    def __init__(self, classes, qd_tracking=False):
         self.classes = classes
         self.labels = list(range(len(self.classes)))
+        self.qd_tracking = qd_tracking
 
     def __call__(self, input_dict):
         """Call function to filter objects by their names.
@@ -1010,6 +1055,22 @@ class ObjectNameFilter(object):
                                   dtype=np.bool_)
         input_dict['gt_bboxes_3d'] = input_dict['gt_bboxes_3d'][gt_bboxes_mask]
         input_dict['gt_labels_3d'] = input_dict['gt_labels_3d'][gt_bboxes_mask]
+        if self.qd_tracking:
+            input_dict['gt_match_indices'] = input_dict['gt_match_indices'][gt_bboxes_mask]
+
+        if 'gt_bboxes_3d_ref' in input_dict:
+            # mask key
+            input_dict['instance_ids_key'] = input_dict['instance_ids_key'][gt_bboxes_mask]
+
+            gt_labels_3d_ref = input_dict['gt_labels_3d_ref']
+            gt_bboxes_mask_ref = np.array([n in self.labels for n in gt_labels_3d_ref],
+                                      dtype=np.bool_)
+            input_dict['gt_bboxes_3d_ref'] = input_dict['gt_bboxes_3d_ref'][gt_bboxes_mask_ref]
+            input_dict['gt_labels_3d_ref'] = input_dict['gt_labels_3d_ref'][gt_bboxes_mask_ref]
+            # input_dict['gt_match_indices_ref'] = input_dict['gt_match_indices_ref'][gt_bboxes_mask_ref]
+            
+            # mask ref
+            input_dict['instance_ids_ref'] = input_dict['instance_ids_ref'][gt_bboxes_mask_ref]
 
         return input_dict
 

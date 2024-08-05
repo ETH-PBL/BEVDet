@@ -53,6 +53,20 @@ def construct_input(input_shape):
     ])
     return input
 
+def construct_radarimg_input(input_shape):
+    rot = torch.eye(4).float().cuda().view(1, 1, 4, 4).expand(1,6,4,4)
+
+    intrins = torch.eye(3).float().cuda().view(1,1, 3, 3).expand(1,6,3,3)
+    input = dict(
+        radar=[torch.empty(100, 18)],
+        img_inputs=[
+        torch.ones(()).new_empty((1, 6, 3, *input_shape)).cuda(), rot,
+        rot, intrins, intrins,
+        torch.ones((1, 6, 3)).cuda(),
+        torch.eye(3).float().cuda().view(1, 3, 3)
+    ])
+    return input
+
 
 def main():
 
@@ -83,6 +97,7 @@ def main():
         cfg.model,
         train_cfg=cfg.get('train_cfg'),
         test_cfg=cfg.get('test_cfg'))
+    
     if torch.cuda.is_available():
         model.cuda()
     model.eval()
@@ -95,7 +110,7 @@ def main():
                 model.__class__.__name__))
 
     flops, params = get_model_complexity_info(
-        model, input_shape, input_constructor=construct_input)
+        model, input_shape, input_constructor=construct_radarimg_input)
     split_line = '=' * 30
     print(f'{split_line}\nInput shape: {input_shape}\n'
           f'Flops: {flops}\nParams: {params}\n{split_line}')

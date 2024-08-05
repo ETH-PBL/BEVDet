@@ -24,6 +24,7 @@ class MVXTwoStageDetector(Base3DDetector):
     def __init__(self,
                  pts_voxel_layer=None,
                  pts_voxel_encoder=None,
+                 radar_voxel_encoder=None,
                  pts_middle_encoder=None,
                  pts_fusion_layer=None,
                  img_backbone=None,
@@ -44,6 +45,15 @@ class MVXTwoStageDetector(Base3DDetector):
         if pts_voxel_encoder:
             self.pts_voxel_encoder = builder.build_voxel_encoder(
                 pts_voxel_encoder)
+        else:   
+            # Needed to adaptively change bev_compressor sizes
+            self.pts_voxel_encoder = None
+        if radar_voxel_encoder:
+            self.radar_voxel_encoder = builder.build_voxel_encoder(
+                radar_voxel_encoder)
+        else:
+            # Needed to adaptively change bev_compressor sizes
+            self.radar_voxel_encoder = None
         if pts_middle_encoder:
             self.pts_middle_encoder = builder.build_middle_encoder(
                 pts_middle_encoder)

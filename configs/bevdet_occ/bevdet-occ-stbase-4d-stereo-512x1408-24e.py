@@ -68,6 +68,10 @@
 
 
 _base_ = ['../_base_/datasets/nus-3d.py', '../_base_/default_runtime.py']
+# Global
+# If point cloud range is changed, the models should also change their point
+# cloud range accordingly
+point_cloud_range = [-51.2, -51.2, -5.0, 51.2, 51.2, 3.0]
 # For nuScenes we usually do 10-class detection
 class_names = [
     'car', 'truck', 'construction_vehicle', 'bus', 'trailer', 'barrier',

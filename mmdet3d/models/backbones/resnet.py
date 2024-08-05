@@ -50,7 +50,13 @@ class CustomResNet(nn.Module):
                 layers.append(nn.Sequential(*layer))
         elif block_type == 'Basic':
             curr_numC = numC_input
+            # print("Let me get some insight into the basic block sizes: ")
             for i in range(len(num_layer)):
+                # print("Layer i: ", i)
+                # print("curr_numC: ", curr_numC)
+                # print("num_channels[i]: ", num_channels[i])
+                # print("stride[i]: ", stride[i])
+                # print("num_layer[i]: ", num_layer[i])
                 layer = [
                     BasicBlock(
                         curr_numC,
@@ -65,10 +71,17 @@ class CustomResNet(nn.Module):
                     BasicBlock(curr_numC, curr_numC, norm_cfg=norm_cfg)
                     for _ in range(num_layer[i] - 1)
                 ])
+                # print("layer: ", layer)
                 layers.append(nn.Sequential(*layer))
         else:
             assert False
         self.layers = nn.Sequential(*layers)
+
+        # Print everything about the model
+        # print("I want to know everything about this shit decoder:")
+        # print("num_channels: ", num_channels)
+        # print("output_ids: ", self.backbone_output_ids)
+        # print("Complete model: ", self.layers)
 
         self.with_cp = with_cp
 

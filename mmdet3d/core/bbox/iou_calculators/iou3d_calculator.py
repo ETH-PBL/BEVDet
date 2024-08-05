@@ -1,9 +1,11 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import torch
+from detectron2.layers.rotated_boxes import pairwise_iou_rotated
 
 from mmdet.core.bbox import bbox_overlaps
 from mmdet.core.bbox.iou_calculators.builder import IOU_CALCULATORS
 from ..structures import get_box_type
+
 
 
 @IOU_CALCULATORS.register_module()
@@ -327,3 +329,27 @@ def axis_aligned_bbox_overlaps_3d(bboxes1,
     enclose_area = torch.max(enclose_area, eps)
     gious = ious - (enclose_area - union) / enclose_area
     return gious
+
+
+@IOU_CALCULATORS.register_module()
+class BboxOverlapsBEV(object):
+    """BEV IoU Calculator."""
+
+    def __init__(self) -> None:
+        pass
+
+    def __call__(self, bboxes1, bboxes2):
+        """Calculate BEV IoU using detectron2 implementation.
+
+        Args:
+            bboxes1 (torch.Tensor): with shape (N, 7+C),
+                (x, y, z, width, height, yaw).
+            bboxes2 (torch.Tensor): with shape (M, 7+C),
+                (x, y, z, width, height, yaw).
+
+        Return:
+            torch.Tensor: Bbox overlaps results of bboxes1 and bboxes2
+                with shape (M, N) (aligned mode is not supported currently).
+        """
+        return pairwise_iou_rotated(bboxes1, bboxes2)
+    

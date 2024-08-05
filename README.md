@@ -1,9 +1,63 @@
+# BEVDet Fork for CA3DT Project
+
+## container for tracker
+
+name of container: main_bevdet_track
+
+**Check 1**: do `docker ps`. you should see the container with the name `main_bevdet_track`. If not, run `docker ps --all`. If you see `main_bevdet_track` here, run `docker start main_bevdet_track`.
+
+Now, if check 1 is successful, you can attach to the container:
+- mode 1: use vscode. Connect to the PBL server with VSCode, the with ssh remote connection connect to running container `main_bevdet_track`
+- mode 2: connecting to multiple vscode remote instances in the same container doesn't really work. to attach to the container with a terminal, use the script `~/bevedet/sec_docker_track.sh`
+
+**Note** installation wise, in this container you can do anything, if needed can be nuked and recreated in ca. 10 minutes. Just DO NOT TOUCH the `main_bevdet` container. 
+
+
+## Installation on SLURM
+
+Ideally use an interactive SLURM session with ```srun``` for the following steps. Make sure to demand enough memory (10GB should be enough with --mem=10G), since creating the environment takes a lot of space.
+
+```shell script
+cd bevdet
+conda env create -f bevdet_docker.yaml
+conda activate bevdet_docker
+pip install mmcv-full==1.5.3 -f https://download.openmmlab.com/mmcv/dist/cu113/torch1.10.0/index.html
+pip install -v -e .
+```
+
+Under ```data``` create a simlink to the nuScenes data:
+
+```
+ln -s /srv/beegfs02/scratch/rl_course/data/proj-ca3dt/nuscenes/ .
+```
+
+Then, also under ```data```, create a ```nuscenes_pkl``` folder, download and add the two pkl-files from: https://drive.google.com/drive/folders/19-ylCQDdCQMk8KipcpgVHxTGzBVismxn?usp=sharing.
+
+Next, create a ```checkpoints``` folder under ```bevdet``` and download the pretrained model from: https://drive.google.com/drive/folders/1JMEla_XRpbsPTXMogcZ6xC6lVm51bgFf (bevdet-r50.pth and bevdet-r50-cbgs.pth both work)
+
+Now you can run the evaluation or training according to the original BEVDet readme.
+
+In the interactive session:
+
+```shell script
+python tools/test.py configs/bevdet/bevdet-r50.py checkpoints/bevdet-r50.pth --eval mAP
+```
+
+Or via SLURM-script:
+
+```shell eval script
+sbatch --gres=gpu:1 eval.sh 
+```
+
+```shell train script
+sbatch --gres=gpu:1 train.sh 
+```
+
 # BEVDet
 
 ![Illustrating the performance of the proposed BEVDet on the nuScenes val set](./resources/nds-fps.png)
 
 ## News
-- **2023.05.07** Improve the occpancy baseline by enlarging the input size and using long-term temporal fusion.
 - **2023.04.28** Support task of [occupancy prediction](https://github.com/CVPR2023-3D-Occupancy-Prediction/CVPR2023-3D-Occupancy-Prediction) .
 - **2023.04.27** Equip BEVDet with stereo depth estimation.
 - **2023.04.10** Use single head for multi-class prediction.
@@ -33,7 +87,6 @@
 | [**BEVDet-R50-4D-Stereo-CBGS**](configs/bevdet/bevdet-r50-4d-stereo-cbgs.py) | 38.2/38.4# | 49.9/50.0# |-  |-  | [baidu](https://pan.baidu.com/s/1237QyV18zvRJ1pU3YzRItw?pwd=npe1) | [baidu](https://pan.baidu.com/s/1237QyV18zvRJ1pU3YzRItw?pwd=npe1) |
 | [**BEVDet-R50-4DLongterm-CBGS**](configs/bevdet/bevdet-r50-4dlongterm-cbgs.py) | 34.8/35.4# | 48.2/48.7# | 30.8/4.2/35.0|28.6 | [baidu](https://pan.baidu.com/s/1237QyV18zvRJ1pU3YzRItw?pwd=npe1) | [baidu](https://pan.baidu.com/s/1237QyV18zvRJ1pU3YzRItw?pwd=npe1) |
 | [**BEVDet-R50-4DLongterm-Depth-CBGS**](configs/bevdet/bevdet-r50-4d-depth-cbgs.py) | 39.4/39.9# | 51.5/51.9# |38.4/4.0/42.4 |23.6 | [baidu](https://pan.baidu.com/s/1237QyV18zvRJ1pU3YzRItw?pwd=npe1) | [baidu](https://pan.baidu.com/s/1237QyV18zvRJ1pU3YzRItw?pwd=npe1) |
-| [**BEVDet-R50-4DLongterm-Stereo-CBGS**](configs/bevdet/bevdet-r50-4dlongterm-stereo-cbgs.py) | 41.1/41.5# | 52.3/52.7# |- |- | [baidu](https://pan.baidu.com/s/1237QyV18zvRJ1pU3YzRItw?pwd=npe1) | [baidu](https://pan.baidu.com/s/1237QyV18zvRJ1pU3YzRItw?pwd=npe1) |
 | [**BEVDet-STBase-4D-Stereo-512x1408-CBGS**](configs/bevdet/bevdet-stbase-4d-stereo-512x1408-cbgs.py) | 47.2# | 57.6# |-  |-  | [baidu](https://pan.baidu.com/s/1237QyV18zvRJ1pU3YzRItw?pwd=npe1) | [baidu](https://pan.baidu.com/s/1237QyV18zvRJ1pU3YzRItw?pwd=npe1) |
 
 \# align previous frame bev feature during the view transformation.
@@ -50,10 +103,8 @@ The latency includes Network/Post-Processing/Total. Training without CBGS is dep
 ### Nuscenes Occupancy
 | Config                                                                    | mIOU       | Model | Log                                                                                            |
 | ------------------------------------------------------------------------- | ---------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| [**BEVDet-Occ-R50-4D-Stereo-2x**](configs/bevdet_occ/bevdet-occ-r50-4d-stereo-24e.py)                                 | 36.1     | [baidu](https://pan.baidu.com/s/1237QyV18zvRJ1pU3YzRItw?pwd=npe1) | [baidu](https://pan.baidu.com/s/1237QyV18zvRJ1pU3YzRItw?pwd=npe1) |
-| [**BEVDet-Occ-R50-4D-Stereo-2x-384x704**](configs/bevdet_occ/bevdet-occ-r50-4d-stereo-24e_384704.py)                  | 37.3     | [baidu](https://pan.baidu.com/s/1237QyV18zvRJ1pU3YzRItw?pwd=npe1) | [baidu](https://pan.baidu.com/s/1237QyV18zvRJ1pU3YzRItw?pwd=npe1) |
-| [**BEVDet-Occ-R50-4DLongterm-Stereo-2x-384x704**](configs/bevdet_occ/bevdet-occ-r50-4dlongterm-stereo-24e_384704.py)  | 39.3     | [baidu](https://pan.baidu.com/s/1237QyV18zvRJ1pU3YzRItw?pwd=npe1) | [baidu](https://pan.baidu.com/s/1237QyV18zvRJ1pU3YzRItw?pwd=npe1) |
-| [**BEVDet-Occ-STBase-4D-Stereo-2x**](configs/bevdet_occ/bevdet-occ-stbase-4d-stereo-512x1408-24e.py)                  | 42.0     | [baidu](https://pan.baidu.com/s/1237QyV18zvRJ1pU3YzRItw?pwd=npe1) | [baidu](https://pan.baidu.com/s/1237QyV18zvRJ1pU3YzRItw?pwd=npe1) |
+| [**BEVDet-Occ-R50-4D-Stereo-2x**](configs/bevdet_occ/bevdet-occ-r50-4d-stereo-24e.py)                            | 36.1     | [baidu](https://pan.baidu.com/s/1237QyV18zvRJ1pU3YzRItw?pwd=npe1) | [baidu](https://pan.baidu.com/s/1237QyV18zvRJ1pU3YzRItw?pwd=npe1) |
+| [**BEVDet-Occ-STBase-4D-Stereo-2x**](configs/bevdet_occ/bevdet-occ-stbase-4d-stereo-512x1408-24e.py)                            | 42.0     | [baidu](https://pan.baidu.com/s/1237QyV18zvRJ1pU3YzRItw?pwd=npe1) | [baidu](https://pan.baidu.com/s/1237QyV18zvRJ1pU3YzRItw?pwd=npe1) |
 ## Inference latency with different backends
 
 | Backend       | 256x704 | 384x1056 | 512x1408 | 640x1760 |
@@ -185,4 +236,70 @@ If this work is helpful for your research, please consider citing the following 
   journal={arXiv preprint arXiv:2112.11790},
   year={2021}
 }
+```
+
+# CR3DT
+
+This is the official implementation of the paper [CR3DT: Camera-Radar 3D Tracking with Multi-Modal Fusion]. 
+
+## Introduction
+The tracking is based on [Quasi-Dense Similarity Learning for Appearance-Only Multiple Object Tracking](https://arxiv.org/pdf/2210.06984.pdf) [github](https://github.com/SysCV/qdtrack)
+
+The following package will need to be installed:
+```
+conda activate bevdet_docker
+python -m pip install detectron2 -f \
+  https://dl.fbaipublicfiles.com/detectron2/wheels/cu113/torch1.10/index.html
+```
+
+**Note**: this package requires the BEV boxes to be in the format `[x_center, y_center, w, h, yaw]`. The `LiDARInstance3DBoxes` from `mmdet3d` are with "bottom center" origin.
+
+## Tracking data
+
+The dataset can be set to add reference cameras info when the `share_data_info['img_info_prototype']` has the string 'QD' in it, similarly to the 4D implementations.
+The loading pipeline will then load the additional cameras if the pipeline stage `PrepareImageInputs` has the `qd_tracking` flag set to `True`.
+An example is in the config [frankennet-r50-qd-track.py](./configs/ca3dt/frankennet-r50-qd-track.py).
+
+`results['reference']` is a list of reference frames, only one is obviously available, but put in a list for consistency with the 4D implementation.
+Ground-truth bounding boxes are available in `results['reference'][0]['gt_boxes']`
+
+Th RoI is obtained using the package whose installation is described above.
+It is implemented with the custom `ROI_EXTRACTOR` mmcv module. 
+
+Currently a Quasi-Dense tracking head is what is missing.
+
+**Note**: the mmdet 2D sampler will mostly work, but one line of it must be changed:
+from this: 
+```python
+# <installation_path>/mmdet/core/bbox/samplers/base_sampler.py
+
+...
+class BaseSampler(metaclass=ABCMeta):
+    ...
+
+    def sample(self,
+               assign_result,
+               bboxes,
+               gt_bboxes,
+               gt_labels=None,
+               **kwargs):
+        ...
+        bboxes = bboxes[:, :4]
+```
+to this:
+```python
+# <installation_path>/mmdet/core/bbox/samplers/base_sampler.py
+
+...
+class BaseSampler(metaclass=ABCMeta):
+    ...
+
+    def sample(self,
+               assign_result,
+               bboxes,
+               gt_bboxes,
+               gt_labels=None,
+               **kwargs):
+        ...
+        bboxes = bboxes[:, :5] # note only change was here from 4 to 5
 ```

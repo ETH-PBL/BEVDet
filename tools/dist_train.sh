@@ -17,4 +17,6 @@ python -m torch.distributed.launch \
     $(dirname "$0")/train.py \
     $CONFIG \
     --seed 0 \
-    --launcher pytorch ${@:3}
+    --launcher pytorch ${@:3} \
+    --validate
+

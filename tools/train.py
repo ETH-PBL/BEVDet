@@ -3,6 +3,7 @@ from __future__ import division
 import argparse
 import copy
 import os
+os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 import time
 import warnings
 from os import path as osp
@@ -36,6 +37,8 @@ def parse_args():
     parser.add_argument('--work-dir', help='the dir to save logs and models')
     parser.add_argument(
         '--resume-from', help='the checkpoint file to resume from')
+    parser.add_argument(
+        '--load-from', help='the checkpoint file to load the weights from')
     parser.add_argument(
         '--auto-resume',
         action='store_true',
@@ -98,6 +101,16 @@ def parse_args():
         '--autoscale-lr',
         action='store_true',
         help='automatically scale lr with the number of gpus')
+    parser.add_argument(
+        '--wandb',
+        type=str,
+        default='online',
+        help='Enable wandb logging. Options: online, offline, disabled')
+    parser.add_argument(
+        '--wandbnotes',
+        type=str,
+        default='',
+        help='Note that is to be added to wandb logging')
     args = parser.parse_args()
     if 'LOCAL_RANK' not in os.environ:
         os.environ['LOCAL_RANK'] = str(args.local_rank)
@@ -137,6 +150,9 @@ def main():
                                 osp.splitext(osp.basename(args.config))[0])
     if args.resume_from is not None:
         cfg.resume_from = args.resume_from
+
+    if args.load_from is not None:
+        cfg.load_from = args.load_from
 
     if args.auto_resume:
         cfg.auto_resume = args.auto_resume
@@ -204,7 +220,7 @@ def main():
 
     # log some basic info
     logger.info(f'Distributed training: {distributed}')
-    logger.info(f'Config:\n{cfg.pretty_text}')
+    # logger.info(f'Config:\n{cfg.pretty_text}')
 
     # set random seeds
     seed = init_random_seed(args.seed)
@@ -222,7 +238,7 @@ def main():
         test_cfg=cfg.get('test_cfg'))
     model.init_weights()
 
-    logger.info(f'Model:\n{model}')
+    # logger.info(f'Model:\n{model}')
     datasets = [build_dataset(cfg.data.train)]
     if len(cfg.workflow) == 2:
         val_dataset = copy.deepcopy(cfg.data.val)
@@ -249,6 +265,17 @@ def main():
             if hasattr(datasets[0], 'PALETTE') else None)
     # add an attribute for visualization convenience
     model.CLASSES = datasets[0].CLASSES
+
+    #Init wandb logging via hook
+    cfg.log_config.hooks = [
+    dict(type='TextLoggerHook'),
+    dict(type='MMDetWandbHook',
+         init_kwargs={'project': 'BEVDet', 'mode': args.wandb, 'notes': args.wandbnotes},
+         interval=5,
+         log_checkpoint=True,
+         log_checkpoint_metadata=True,
+         num_eval_images=100),]
+    
     train_model(
         model,
         datasets,

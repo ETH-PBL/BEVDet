@@ -47,11 +47,16 @@ class LSSViewTransformer(BaseModule):
         accelerate=False,
         sid=False,
         collapse_z=True,
+
     ):
         super(LSSViewTransformer, self).__init__()
         self.grid_config = grid_config
         self.downsample = downsample
         self.create_grid_infos(**grid_config)
+        # For FrankenNet
+        # grid_lower_bound tensor([-51.2000, -51.2000,  -5.0000])
+        # grid_interval tensor([0.8000, 0.8000, 8.0000])
+        # grid_size tensor([128., 128., 1.])
         self.sid = sid
         self.frustum = self.create_frustum(grid_config['depth'],
                                            input_size, downsample)
@@ -191,12 +196,26 @@ class LSSViewTransformer(BaseModule):
         bev_feat_shape = (depth.shape[0], int(self.grid_size[2]),
                           int(self.grid_size[1]), int(self.grid_size[0]),
                           feat.shape[-1])  # (B, Z, Y, X, C)
+        
+        # print("bev_feat_shape", bev_feat_shape) 
+        # is (8, 1, 128, 128, 64)
+        # now (8, 8, 128, 128, 64)
+
+        # This does the actual LSS
         bev_feat = bev_pool_v2(depth, feat, ranks_depth, ranks_feat, ranks_bev,
                                bev_feat_shape, interval_starts,
                                interval_lengths)
+        
+        # print("bev_feat.shape", bev_feat.shape)
+        # is torch.Size([8, 64, 1, 128, 128])
+        # now torch.Size([8, 64, 8, 128, 128]) <-> (B, C, Z, Y, X)
+
         # collapse Z
         if self.collapse_z:
             bev_feat = torch.cat(bev_feat.unbind(dim=2), 1)
+            # print("bev_feat.shape after collapse", bev_feat.shape)
+            # is torch.Size([8, 64, 128, 128])
+            # now torch.Size([8, 512, 128, 128])
         return bev_feat
 
     def voxel_pooling_prepare_v2(self, coor):
@@ -215,18 +234,17 @@ class LSSViewTransformer(BaseModule):
         B, N, D, H, W, _ = coor.shape
         num_points = B * N * D * H * W
         # record the index of selected points for acceleration purpose
-        ranks_depth = torch.range(
-            0, num_points - 1, dtype=torch.int, device=coor.device)
-        ranks_feat = torch.range(
-            0, num_points // D - 1, dtype=torch.int, device=coor.device)
+        ranks_depth = torch.arange(
+            0, num_points, dtype=torch.int, device=coor.device)
+        ranks_feat = torch.arange(
+            0, num_points // D, dtype=torch.int, device=coor.device)
         ranks_feat = ranks_feat.reshape(B, N, 1, H, W)
         ranks_feat = ranks_feat.expand(B, N, D, H, W).flatten()
         # convert coordinate into the voxel space
         coor = ((coor - self.grid_lower_bound.to(coor)) /
                 self.grid_interval.to(coor))
         coor = coor.long().view(num_points, 3)
-        batch_idx = torch.range(0, B - 1).reshape(B, 1). \
-            expand(B, num_points // B).reshape(num_points, 1).to(coor)
+        batch_idx = torch.arange(0, B).reshape(B, 1).expand(B, num_points // B).reshape(num_points, 1).to(coor.device)
         coor = torch.cat((coor, batch_idx), 1)
 
         # filter out points that are outside box
@@ -267,7 +285,6 @@ class LSSViewTransformer(BaseModule):
 
     def view_transform_core(self, input, depth, tran_feat):
         B, N, C, H, W = input[0].shape
-
         # Lift-Splat
         if self.accelerate:
             feat = tran_feat.view(B, N, self.out_channels, H, W)
@@ -276,6 +293,8 @@ class LSSViewTransformer(BaseModule):
             bev_feat_shape = (depth.shape[0], int(self.grid_size[2]),
                               int(self.grid_size[1]), int(self.grid_size[0]),
                               feat.shape[-1])  # (B, Z, Y, X, C)
+
+            # This does the actual LSS
             bev_feat = bev_pool_v2(depth, feat, self.ranks_depth,
                                    self.ranks_feat, self.ranks_bev,
                                    bev_feat_shape, self.interval_starts,
@@ -283,7 +302,9 @@ class LSSViewTransformer(BaseModule):
 
             bev_feat = bev_feat.squeeze(2)
         else:
+            # According to our tests we take this path here
             coor = self.get_lidar_coor(*input[1:7])
+            
             bev_feat = self.voxel_pooling_v2(
                 coor, depth.view(B, N, self.D, H, W),
                 tran_feat.view(B, N, self.out_channels, H, W))
@@ -306,11 +327,16 @@ class LSSViewTransformer(BaseModule):
         """
         x = input[0]
         B, N, C, H, W = x.shape
-        x = x.view(B * N, C, H, W)
+        # x.shape is torch.Size([8, 6, 256, 16, 44])
+        x = x.contiguous().view(B * N, C, H, W)
+        # x.shape is torch.Size([48, 256, 16, 44])
         x = self.depth_net(x)
-
+        # x.shape is torch.Size([48, 123, 16, 44])
+        # self.D is 59 -> I think number of depth buckets
         depth_digit = x[:, :self.D, ...]
         tran_feat = x[:, self.D:self.D + self.out_channels, ...]
+        # tran_feat is torch.Size([48, 64, 16, 44])
+        # Which would be our 64 features per point I guess?
         depth = depth_digit.softmax(dim=1)
         return self.view_transform(input, depth, tran_feat)
 
