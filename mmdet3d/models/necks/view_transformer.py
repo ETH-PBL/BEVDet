@@ -53,10 +53,6 @@ class LSSViewTransformer(BaseModule):
         self.grid_config = grid_config
         self.downsample = downsample
         self.create_grid_infos(**grid_config)
-        # For FrankenNet
-        # grid_lower_bound tensor([-51.2000, -51.2000,  -5.0000])
-        # grid_interval tensor([0.8000, 0.8000, 8.0000])
-        # grid_size tensor([128., 128., 1.])
         self.sid = sid
         self.frustum = self.create_frustum(grid_config['depth'],
                                            input_size, downsample)

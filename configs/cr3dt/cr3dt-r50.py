@@ -1,5 +1,3 @@
-# Copyright (c) Ferrari PBL Team 2023
-
 # mAP: -
 # mATE: -
 # mASE: -
@@ -22,7 +20,7 @@
 # barrier	
 
 
-#ON MINI
+#ON MINI:
 # mAP: 0.3494                                                                                                                                                                                                                                        
 # mATE: 0.6726
 # mASE: 0.4735

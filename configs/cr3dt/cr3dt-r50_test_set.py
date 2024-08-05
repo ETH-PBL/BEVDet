@@ -1,5 +1,3 @@
-# Copyright (c) Ferrari PBL Team 2023
-
 # mAP: -
 # mATE: -
 # mASE: -
