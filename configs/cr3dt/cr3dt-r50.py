@@ -147,7 +147,7 @@ else:
 # MODEL #
 #########
 model = dict(
-    type='FrankenNet',
+    type='CR3DTNet',
     late_fusion=late_fusion,
     # Image feature extractor
     img_backbone=dict(
