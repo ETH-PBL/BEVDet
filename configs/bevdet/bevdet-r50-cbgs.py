@@ -163,7 +163,7 @@ model = dict(
 # Data
 dataset_type = 'NuScenesDataset'
 data_root = 'data/nuscenes/'
-data_root_pkl = 'data/nuscenes_pkl/'
+data_root_pkl = 'data/nuscenes/'
 file_client_args = dict(backend='disk')
 
 bda_aug_conf = dict(

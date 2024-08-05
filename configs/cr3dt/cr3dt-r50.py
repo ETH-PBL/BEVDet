@@ -21,6 +21,30 @@
 # traffic_cone	
 # barrier	
 
+
+#ON MINI
+# mAP: 0.3494                                                                                                                                                                                                                                        
+# mATE: 0.6726
+# mASE: 0.4735
+# mAOE: 0.6878
+# mAVE: 0.5607
+# mAAE: 0.2955
+# NDS: 0.4057
+# Eval time: 1.5s
+
+# Per-class results:
+# Object Class    AP      ATE     ASE     AOE     AVE     AAE
+# car     0.660   0.409   0.173   0.159   0.142   0.073
+# truck   0.496   0.352   0.256   0.097   0.072   0.000
+# bus     0.589   0.448   0.087   0.104   0.970   0.018
+# trailer 0.000   1.000   1.000   1.000   1.000   1.000
+# construction_vehicle    0.000   1.000   1.000   1.000   1.000   1.000
+# pedestrian      0.519   0.626   0.272   0.702   0.500   0.227
+# motorcycle      0.403   0.733   0.292   1.323   0.073   0.000
+# bicycle 0.180   0.739   0.249   0.805   0.729   0.047
+# traffic_cone    0.647   0.421   0.404   nan     nan     nan
+# barrier 0.000   1.000   1.000   1.000   nan     nan
+
 import math
 
 

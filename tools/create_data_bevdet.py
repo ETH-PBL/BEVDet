@@ -128,11 +128,15 @@ def nuscenes_data_prep(root_path,
     #                             f'{out_dir}/{info_prefix}_infos_train.pkl')
 
 
-def add_ann_adj_info(extra_tag, root_path, out_dir):
-    nuscenes_version = 'v1.0-test'
+def add_ann_adj_info(extra_tag, root_path, out_dir, version):
+    nuscenes_version = version
     dataroot = root_path
     nuscenes = NuScenes(nuscenes_version, dataroot)
-    for set in ['test']:
+    if version == 'v1.0-test':
+        sets = ['test']
+    else:
+        sets = ['train', 'val']
+    for set in sets:
         dataset = pickle.load(
             open(out_dir+'/%s_infos_%s.pkl' % (extra_tag, set), 'rb'))
         for id in range(len(dataset['infos'])):
@@ -222,4 +226,5 @@ if __name__ == '__main__':
     print('add_ann_infos')
     add_ann_adj_info(extra_tag=args.extra_tag,
                      root_path=args.root_path,
-                     out_dir=args.out_dir)
+                     out_dir=args.out_dir,
+                     version=args.version)

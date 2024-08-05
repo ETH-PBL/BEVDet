@@ -9,6 +9,7 @@ docker run --tty \
     --interactive \
     --volume $data_dir/v1.0-trainval:/root/cr3dt/data/nuscenes \
     --volume $data_dir/v1.0-mini:/root/cr3dt/data/nuscenes_mini \
+    --volume $data_dir/v1.0-test:/root/cr3dt/data/nuscenes_test \
     --volume $data_dir/checkpoints:/root/cr3dt/checkpoints \
     --ipc=host\
     --network=host \
