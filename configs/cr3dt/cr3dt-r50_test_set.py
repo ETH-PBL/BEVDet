@@ -24,8 +24,6 @@
 import math
 
 
-_base_ = ["./frankennet-r50.py"]
-
 # If point cloud range is changed, the models should also change their point
 # cloud range accordingly
 point_cloud_range = [-51.2, -51.2, -5.0, 51.2, 51.2, 3.0]
@@ -49,7 +47,7 @@ data_config = {
     # Augmentation
     'resize': (-0.06, 0.11),
     'rot': (-5.4, 5.4),
-    'flip': True,  #TURNED OFF FOR NOW
+    'flip': True,  
     'crop_h': (0.0, 0.0),
     'resize_test': 0.00,
 }
@@ -70,12 +68,7 @@ bda_aug_conf = dict(
     scale_lim=(0.95, 1.05),
     flip_dx_ratio=0.5,
     flip_dy_ratio=0.5)
-    # rot_lim=(0, 0),
-    # scale_lim=(1, 1),
-    # flip_dx_ratio=0.0,
-    # flip_dy_ratio=0.0)
 
-# TODO: I think this is an intermediate variable and overwrites the _base_ config file completely!
 train_pipeline = [
     dict(
         type='PrepareImageInputs',
@@ -99,9 +92,6 @@ train_pipeline = [
         rot_range=[0, 0],
         scale_ratio_range=[1., 1.],
         translation_std=[0, 0, 0]),
-        # rot_range=[-0.3925, 0.3925],
-        # scale_ratio_range=[0.95, 1.05],
-        # translation_std=[0, 0, 0]),
     dict(type='RandomFlip3D', flip_ratio_bev_horizontal=0.0), #TODO flip was 0.5
     dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='PointShuffle'),
@@ -140,7 +130,6 @@ test_pipeline = [
                 rot_range=[0, 0],
                 scale_ratio_range=[1., 1.],
                 translation_std=[0, 0, 0]),
-            #dict(type='RandomFlip3D'),
             dict(
                 type='PointsRangeFilter', point_cloud_range=point_cloud_range),
             dict(
@@ -163,7 +152,7 @@ share_data_config = dict(
     type=dataset_type,
     classes=class_names,
     modality=input_modality,
-    img_info_prototype='bevdet', # TODO: Change?
+    img_info_prototype='bevdet', 
 )
 
 test_data_config = dict(
@@ -191,7 +180,6 @@ for key in ['train', 'val', 'test']:
     data[key].update(share_data_config)
 
 # Optimizer
-# TODO: Change?
 optimizer = dict(type='AdamW', lr=2e-4, weight_decay=1e-07)
 optimizer_config = dict(
     grad_clip=dict(max_norm=5, norm_type=2), 
@@ -205,7 +193,6 @@ lr_config = dict(
     step=[24,])
 runner = dict(type='EpochBasedRunner', max_epochs=50)
 
-# TODO: No fucking clue what this does
 custom_hooks = [
     dict(
         type='MEGVIIEMAHook',
@@ -217,4 +204,3 @@ custom_hooks = [
 # Sets eval interval, THIS HAS TO BE THE SAME as in the Checkpoint interval!
 evaluation = dict(interval=2)
 checkpoint_config = dict(interval=2)
-# fp16 = dict(loss_scale='dynamic')

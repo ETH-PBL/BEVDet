@@ -50,7 +50,7 @@ data_config = {
     # Augmentation
     'resize': (-0.06, 0.11),
     'rot': (-5.4, 5.4),
-    'flip': True,  #TURNED OFF FOR NOW
+    'flip': True, 
     'crop_h': (0.0, 0.0),
     'resize_test': 0.00,
 }
@@ -59,7 +59,6 @@ data_config = {
 image_grid_config = { # lower, upper, interval
     'x': [-51.2, 51.2, 0.8], # 128 bins -> Original SimpleBEV uses 200
     'y': [-51.2, 51.2, 0.8], # 128 bins -> Original SimpleBEV uses 200
-    # 'z': [-5, 3, 0.8],         # 8 bin -> This is SimpleBEV style
     'z': [-5, 3, 8],          # 1 bin -> This was the original BEVDet approach to pooling
     'depth': [1.0, 60.0, 1.0],
 }
@@ -74,7 +73,6 @@ pts_grid_config = { # lower, upper, interval
 pts_z_num_cells = int((pts_grid_config['z'][1] - pts_grid_config['z'][0]) / pts_grid_config['z'][2])
 
 
-# TODO: Where exactly is this used and is this reasonable?
 # Because the lift-splat-shoot of the image features is based on the voxel sizes given above
 voxel_size = [0.1, 0.1, 0.2]
 
@@ -119,7 +117,7 @@ else:
     }
     img_z_num_cells = int((image_grid_config['z'][1] - image_grid_config['z'][0]) / image_grid_config['z'][2])
 
-# POSSIBLE ABLATION 3 
+# ABLATION 3 
 # radar encoding
 radar_encoding = 'RadarPillarFE' #  'RadarPillarFE' or 'OccupancyVFE'
 
@@ -176,14 +174,10 @@ model = dict(
         out_channels=numC_Trans,
         downsample=16),
     # INTERMEDIATE FUSION
-    # Point feature extractor - OccupancyVFE or RadarPillarFE
-    # TODO This is for LiDAR point cloud?
-    # pts_voxel_encoder=dict(type='OccupancyVFE', grid_config=pts_grid_config, transpose=True, rot=True, rot_angle=math.pi/2), # Our custom VFE which also voxelizes the points
     # is decided above in ablation parameters
     radar_voxel_encoder=radar_voxel_encoder,
     # is decided above in ablation parameters
     bev_compressor=dict(img_feat_dim=numC_Trans, pts_feat_dim=pts_z_num_cells, radar_feat_dim=radar_feat_dim*radar_z_num_cells, img_grid_height=img_z_num_cells) if bev_compression else None, 
-    # TODO: Currently, qd_track is definitely not compatible with the bev_compressor
     img_bev_encoder_backbone=dict(
         type='CustomResNet',
         numC_input=numC_Trans_Fused,
@@ -270,12 +264,7 @@ bda_aug_conf = dict(
     scale_lim=(0.95, 1.05),
     flip_dx_ratio=0.5,
     flip_dy_ratio=0.5)
-    # rot_lim=(0, 0),
-    # scale_lim=(1, 1),
-    # flip_dx_ratio=0.0,
-    # flip_dy_ratio=0.0)
 
-# TODO: I think this is an intermediate variable and overwrites the _base_ config file completely!
 train_pipeline = [
     dict(
         type='PrepareImageInputs',
@@ -299,10 +288,7 @@ train_pipeline = [
         rot_range=[0, 0],
         scale_ratio_range=[1., 1.],
         translation_std=[0, 0, 0]),
-        # rot_range=[-0.3925, 0.3925],
-        # scale_ratio_range=[0.95, 1.05],
-        # translation_std=[0, 0, 0]),
-    dict(type='RandomFlip3D', flip_ratio_bev_horizontal=0.0), #TODO flip was 0.5
+    dict(type='RandomFlip3D', flip_ratio_bev_horizontal=0.0), 
     dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='PointShuffle'),
     dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
@@ -340,7 +326,6 @@ test_pipeline = [
                 rot_range=[0, 0],
                 scale_ratio_range=[1., 1.],
                 translation_std=[0, 0, 0]),
-            #dict(type='RandomFlip3D'),
             dict(
                 type='PointsRangeFilter', point_cloud_range=point_cloud_range),
             dict(
@@ -363,7 +348,7 @@ share_data_config = dict(
     type=dataset_type,
     classes=class_names,
     modality=input_modality,
-    img_info_prototype='bevdet', # TODO: Change?
+    img_info_prototype='bevdet', 
 )
 
 test_data_config = dict(
@@ -391,7 +376,6 @@ for key in ['train', 'val', 'test']:
     data[key].update(share_data_config)
 
 # Optimizer
-# TODO: Change?
 optimizer = dict(type='AdamW', lr=2e-4, weight_decay=1e-07)
 optimizer_config = dict(
     grad_clip=dict(max_norm=5, norm_type=2), 
@@ -405,7 +389,6 @@ lr_config = dict(
     step=[24,])
 runner = dict(type='EpochBasedRunner', max_epochs=50)
 
-# TODO: No fucking clue what this does
 custom_hooks = [
     dict(
         type='MEGVIIEMAHook',
@@ -417,4 +400,3 @@ custom_hooks = [
 # Sets eval interval, THIS HAS TO BE THE SAME as in the Checkpoint interval!
 evaluation = dict(interval=2)
 checkpoint_config = dict(interval=2)
-# fp16 = dict(loss_scale='dynamic')
