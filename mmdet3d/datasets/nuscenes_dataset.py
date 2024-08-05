@@ -111,7 +111,6 @@ class NuScenesDataset(Custom3DDataset):
         'vehicle.parked',
         'vehicle.stopped',
     ]
-    # https://github.com/nutonomy/nuscenes-devkit/blob/57889ff20678577025326cfc24e57424a829be0a/python-sdk/nuscenes/eval/detection/evaluate.py#L222 # noqa
     ErrNameMapping = {
         'trans_err': 'mATE',
         'scale_err': 'mASE',
@@ -235,7 +234,7 @@ class NuScenesDataset(Custom3DDataset):
         # standard protocol modified from SECOND.Pytorch
         input_dict = dict(
             sample_idx=info['token'],
-            pts_filename=info['lidar_path'], # TODO: Change to radar_path to load that?
+            pts_filename=info['lidar_path'], 
             sweeps=info['sweeps'],
             timestamp=info['timestamp'] / 1e6,
         )
@@ -281,11 +280,8 @@ class NuScenesDataset(Custom3DDataset):
                     info_ref_list = self.get_ref_info(info, index, scope=5)
                     input_dict.update(dict(reference=info_ref_list))
                     if not self.test_mode:
-                        # annos = self.get_ann_info(index)
                         if 'ann_infos' in input_dict['reference'][0]:
                             input_dict['ann_infos_ref'] = input_dict['reference'][0]['ann_infos']
-                        # print(f" Len of key and ref bboxes {len(input_dict['ann_infos'][0]), len(input_dict['ann_infos_ref'][0])}")
-                        # print(f"len of instance ids here from data {len(input_dict['ann_infos'][2]), len(input_dict['ann_infos_ref'][2])}")
                     
                     input_dict['curr']['instance_ids'] = info['ann_infos'][2]
                     for i, inst_id in enumerate(input_dict['curr']['instance_ids']):
@@ -371,7 +367,6 @@ class NuScenesDataset(Custom3DDataset):
         if 'instance_ids' in ann_info:
             ins_ids = list(ann_info['instance_ids'])
             ref_ins_ids = list(ann_info_ref['instance_ids'])
-            # print(f"Lens of track ids: {len(ins_ids)} {len(ref_ins_ids)}")
             match_indices = np.array([
                 ref_ins_ids.index(i) if i in ref_ins_ids else -1
                 for i in ins_ids
@@ -380,13 +375,10 @@ class NuScenesDataset(Custom3DDataset):
                 ins_ids.index(i) if i in ins_ids else -1 for i in ref_ins_ids
             ])
             if sum(match_indices) <= -len(match_indices) and sum(match_indices) != 0:
-                print(f"ULTRAWEIRD")
                 print(f"Match indices: {match_indices}")
                 print(f"Ref match indices: {ref_match_indices}")
                 print(f"Ins ids: {ins_ids}")
                 print(f"Ref ins ids: {ref_ins_ids}")
-                # print(f"Full info: {ann_info}")
-                # print(f"Full ref info: {ann_info_ref}")
         else:
             match_indices = np.arange(ann_info['bboxes'].shape[0], dtype=np.int64)
             ref_match_indices = match_indices.copy()
@@ -459,8 +451,6 @@ class NuScenesDataset(Custom3DDataset):
 
         print('Start to convert detection format...')
         for sample_id, det in enumerate(mmcv.track_iter_progress(results)):
-            # TODO: simple trick for BEVDet to manage to get nusc json
-            # det = det[0]
             boxes = det['boxes_3d'].tensor.numpy()
             scores = det['scores_3d'].numpy()
             labels = det['labels_3d'].numpy()
@@ -774,10 +764,6 @@ def output_to_nusc_box(detection, with_velocity=True):
             velocity = (*box3d.tensor[i, 7:9], 0.0)
         else:
             velocity = (0, 0, 0)
-        # velo_val = np.linalg.norm(box3d[i, 7:9])
-        # velo_ori = box3d[i, 6]
-        # velocity = (
-        # velo_val * np.cos(velo_ori), velo_val * np.sin(velo_ori), 0.0)
         box = NuScenesBox(
             box_gravity_center[i],
             nus_box_dims[i],

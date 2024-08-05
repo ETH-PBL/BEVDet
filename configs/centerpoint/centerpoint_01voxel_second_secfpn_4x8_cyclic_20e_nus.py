@@ -118,7 +118,7 @@ test_pipeline = [
         ])
 ]
 
-# This is only for the submission I think and does not change the loading of the data
+# This is only for the submission
 input_modality = dict(
     use_lidar=True,
     use_camera=True,

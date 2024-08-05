@@ -532,25 +532,20 @@ class LoadRadarPointsFromFile(object):
             current_sd_rec = radar_pcl[radar_name]
 
             current_pc = RadarPointCloud.from_file(current_sd_rec['filename'])
-            # TODO: Use min_distance?
-            # current_pc.remove_close(min_distance)
 
             current_cs_rec = current_sd_rec['calibrated_sensor']
             car_from_current = transform_matrix(current_cs_rec['translation'], Quaternion(current_cs_rec['rotation']),
                                                 inverse=False)
             current_pc.transform(car_from_current)
 
-            # TODO: SimpleBEV additionally uses time as a feature which is omitted here, evaluate if needed
             new_points = (current_pc.points)
             # Adding additional sweeps of self.sweeps_num > 0
             nsweep = min(self.sweeps_num, len(current_sd_rec['sweep_paths']))
             for index in range(nsweep):
-                # print("Adding Sweep", index)
                 filename = current_sd_rec['sweep_paths'][index]
                 current_pc = RadarPointCloud.from_file(filename)
                 current_pc.transform(car_from_current)
                 new_points = np.concatenate((new_points,current_pc.points),1)
-                # print(new_points.shape)
 
             points = np.concatenate((points, new_points), 1)
         return points.T

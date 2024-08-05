@@ -92,7 +92,7 @@ train_pipeline = [
         rot_range=[0, 0],
         scale_ratio_range=[1., 1.],
         translation_std=[0, 0, 0]),
-    dict(type='RandomFlip3D', flip_ratio_bev_horizontal=0.0), #TODO flip was 0.5
+    dict(type='RandomFlip3D', flip_ratio_bev_horizontal=0.0), 
     dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='PointShuffle'),
     dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
