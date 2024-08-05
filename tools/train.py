@@ -105,7 +105,7 @@ def parse_args():
         '--wandb',
         type=str,
         default='disabled',
-        help='Enable wandb logging. Options: online, offline, disabled')
+        help='Enable wandb logging. Options: run, disabled.')
     parser.add_argument(
         '--wandbnotes',
         type=str,
@@ -265,14 +265,17 @@ def main():
     model.CLASSES = datasets[0].CLASSES
 
     #Init wandb logging via hook
-    cfg.log_config.hooks = [
-    dict(type='TextLoggerHook'),
-    dict(type='MMDetWandbHook',
-         init_kwargs={'project': 'BEVDet', 'mode': args.wandb, 'notes': args.wandbnotes},
-         interval=5,
-         log_checkpoint=True,
-         log_checkpoint_metadata=True,
-         num_eval_images=100),]
+    if args.wandb == 'disabled':
+        cfg.log_config.hooks = [dict(type='TextLoggerHook')]
+    else:
+        cfg.log_config.hooks = [
+            dict(type='TextLoggerHook'),
+            dict(type='MMDetWandbHook',
+                init_kwargs={'project': 'CR3DT Detector', 'mode': args.wandb, 'notes': args.wandbnotes},
+                interval=5,
+                log_checkpoint=True,
+                log_checkpoint_metadata=True,
+                num_eval_images=100),]
     
     train_model(
         model,
