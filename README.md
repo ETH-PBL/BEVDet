@@ -1,72 +1,94 @@
 # BEVDet Fork for CR3DT Detector
-
 This is the official code implementation to the paper [CR3DT: Camera-Radar 3D Tracking with Multi-Modal Fusion](https://arxiv.org/abs/2403.15313). 
 
-## Introduction
-The tracking is based on [Quasi-Dense Similarity Learning for Appearance-Only Multiple Object Tracking](https://arxiv.org/pdf/2210.06984.pdf) [github](https://github.com/SysCV/qdtrack)
 
 ## Get Started
 
 #### Installation and Data Preparation
 
-Step 1. Use the provided docker file to create the needed container [Docker](docker/Dockerfile).
-
-Step 2. Download the dataset and save it in the folder ..., download the checkpoints from ... and the pkl files from (only works if the volume mount point within the container is unchanged)
-
-Step 3. Start the docker container with the necessary flags using the provided utility script
+Step 1. Clone this repository.
 ```shell script
-docker/main_docker.sh
+git clone git@github.com:ETH-PBL/BEVDet.git
 ```
 
-Step 4. Finalize the setup of the conda environment
+Step 2. Use the provided docker file to create the needed container [Docker](docker/Dockerfile).
 ```shell script
-conda activate bevdet_docker
+docker build -t cr3dt_detector -f docker/Dockerfile .
+```
+
+Step 3. Create the folder structure below anywhere on your file system. You can chose to populate the folders with the nuScenes dataset and our provided pkl-files and checkpoints ([Google Drive with checkpoint and pkls](https://drive.google.com/drive/folders/1gHPZMUCDObDTHqbU_7Drw0CILx4pu_7i)), or just with the dataset and to create any pkl-files and checkpoints yourself. At least one of the three dataset folders (`v1.0-mini`, `v1.0-trainval`, or `v1.0-test`) needs to be populated.
+```shell script
+...
+├── <your data directory>
+│   ├── v1.0-mini
+│   ├── v1.0-trainval
+│   ├── v1.0-test
+│   └── checkpoints
+└ ...
+```
+
+Step 4. Start the docker container with the necessary flags using the provided utility script. After that you can open a second interactive shell to the docker using `sec_docker.sh`.
+```shell script
+./docker/main_docker.sh <path to your data directory>
+./docker/sec_docker.sh
+```
+
+Step 5. Only needed once: Finalize the setup of the conda environment
+```shell script
+conda activate cr3dt_docker
 pip install -v -e .
 python -m pip install detectron2 -f \
   https://dl.fbaipublicfiles.com/detectron2/wheels/cu113/torch1.10/index.html
 ```
 
-Step 5. Prepare nuScenes dataset as introduced in [nuscenes_det.md](docs/en/datasets/nuscenes_det.md) and create the pkl for CR3DT by running (if not mounted externally):
+Step 6. Prepare nuScenes dataset as introduced in [nuscenes_det.md](docs/en/datasets/nuscenes_det.md) and create the pkl (if not mounted externally) for CR3DT by running the following script with the appropriate argument (`trainval`, `mini`, or `test`):
 ```shell script
-python tools/create_data_bevdet.py
+./tools/create_data.sh trainval # mini, test
 ```
 
 
 **Note**: this package requires the BEV boxes to be in the format `[x_center, y_center, w, h, yaw]`. The `LiDARInstance3DBoxes` from `mmdet3d` are with "bottom center" origin.
 
+**Note**: To train or evaluate on the mini dataset, [the `cr3dt-r50.py` config](configs/cr3dt/cr3dt-r50.py#L258) needs to be adapted accordingly (see comment in file).
+
 #### Train model
 ```shell
-# single gpu
-python tools/train.py $config
+python tools/train.py configs/cr3dt/cr3dt-r50.py --validate
+# or from the provided checkpoint 
+python tools/train.py configs/cr3dt/cr3dt-r50.py --validate --resume-from checkpoints/cr3dt.pth
 ```
+
+**Note**: See `python tools/train.py --help` for more options.
 
 #### Test model
 ```shell
 # single gpu
-python tools/test.py $config $checkpoint --eval mAP
+python tools/test.py configs/cr3dt/cr3dt-r50.py checkpoints/cr3dt.pth --eval mAP
 ```
 
-#### Estimate the inference speed of BEVDet
+#### Estimate the inference speed of CR3DT
 
 ```shell
 # with pre-computation acceleration
-python tools/analysis_tools/benchmark.py $config $checkpoint --fuse-conv-bn
+python tools/analysis_tools/benchmark.py configs/cr3dt/cr3dt-r50.py checkpoints/cr3dt.pth --fuse-conv-bn
 ```
 
-#### Estimate the flops of BEVDet
+#### Estimate the flops of CR3DT
 
 ```shell
-python tools/analysis_tools/get_flops.py configs/bevdet/bevdet-r50.py --shape 256 704
+python tools/analysis_tools/get_flops.py configs/cr3dt/cr3dt-r50.py --shape 256 704
 ```
 
 #### Visualize the predicted result.
 
-- Private implementation. (Visualization remotely/locally)
+- Implementation of original [BEVDet](https://github.com/HuangJunJie2017/BEVDet).
 
 ```shell
-python tools/test.py $config $checkpoint --format-only --eval-options jsonfile_prefix=$savepath
+python tools/test.py configs/cr3dt/cr3dt-r50.py checkpoints/cr3dt.pth --format-only --eval-options jsonfile_prefix=$savepath
 python tools/analysis_tools/vis.py $savepath/pts_bbox/results_nusc.json
 ```
+
+**Note**: For mini add the flag: `--root_path ./data/nuscenes_mini`.
 
 ## Acknowledgement
 
@@ -79,11 +101,6 @@ This project is not possible without multiple great open-sourced code bases. We 
 - [Swin Transformer](https://github.com/microsoft/Swin-Transformer)
 - [BEVFusion](https://github.com/mit-han-lab/bevfusion)
 - [BEVDepth](https://github.com/Megvii-BaseDetection/BEVDepth)
-
-Beside, there are some other attractive works extend the boundary of BEVDet.
-
-- [BEVerse](https://github.com/zhangyp15/BEVerse)  for multi-task learning.
-- [BEVStereo](https://github.com/Megvii-BaseDetection/BEVStereo)  for stero depth estimation.
 
 ## Bibtex
 
