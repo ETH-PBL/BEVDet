@@ -4,5 +4,5 @@
 
 docker exec --tty \
     --interactive \
-    main_bevdet \
+    main_cr3dt \
     /bin/bash

@@ -1,17 +1,18 @@
 #! /bin/bash
 
+#dataset path as arg
+data_dir=$1
+
 docker run --tty \
     -d \
     --gpus all \
     --interactive \
-    --volume /home/forzapbldesktop/Downloads/v1.0-mini:/root/bevdet/data/nuscenes \
-    --volume /home/forzapbldesktop/Downloads/v1.0-mini:/root/bevdet/data/nuscenes_mini/mini \
-    --volume /home/forzapbldesktop/Downloads/mini_pkls:/root/bevdet/data/nuscenes_mini \
-    --volume /home/forzapbldesktop/Downloads/checkpoints:/root/bevdet/checkpoints \
-    --volume /home/forzapbldesktop/Downloads/nuscenes_out:/root/bevdet/data/nuscenes_out \
+    --volume $data_dir/v1.0-trainval:/root/cr3dt/data/nuscenes \
+    --volume $data_dir/v1.0-mini:/root/cr3dt/data/nuscenes_mini \
+    --volume $data_dir/checkpoints:/root/cr3dt/checkpoints \
     --ipc=host\
     --network=host \
     --privileged \
-    --name main_bevdet \
-    pbl/bevdet \
+    --name main_cr3dt \
+    cr3dt_detector \
     /bin/bash

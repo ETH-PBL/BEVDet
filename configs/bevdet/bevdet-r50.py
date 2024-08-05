@@ -162,11 +162,11 @@ model = dict(
 # Data
 dataset_type = 'NuScenesDataset'
 data_root = 'data/nuscenes/v1_0-test/'
-data_root_pkl = 'data/nuscenes_out/'
+data_root_pkl = 'data/nuscenes/'
 file_client_args = dict(backend='disk')
 
 #For mini uncomment this
-# data_root = 'data/nuscenes_mini/mini/'
+# data_root = 'data/nuscenes_mini/'
 # data_root_pkl = 'data/nuscenes_mini/'
 
 bda_aug_conf = dict(

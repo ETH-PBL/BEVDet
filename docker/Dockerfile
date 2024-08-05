@@ -1,7 +1,7 @@
 # freezing to the correct cuda installation
 FROM nvidia/cuda:11.3.1-devel-ubuntu20.04
 
-ADD .. /root/bevdet
+ADD .. /root/cr3dt
 
 ARG DEBIAN_FRONTEND=noninteractive
 RUN apt-get clean && apt-get update &&\
@@ -17,11 +17,8 @@ RUN curl -fsSL -v -o ~/miniconda.sh -O  https://repo.anaconda.com/miniconda/Mini
 
 
 # CONDA ENVIRONMENT
-RUN /opt/conda/bin/conda env create -f /root/bevdet/bevdet_docker.yaml
+RUN /opt/conda/bin/conda env create -f /root/cr3dt/cr3dt_docker.yaml
 
 RUN /opt/conda/bin/conda init bash 
 
-RUN . ~/.bashrc && conda activate bevdet_docker && pip install mmcv-full==1.5.3 -f https://download.openmmlab.com/mmcv/dist/cu113/torch1.10.0/index.html
-
-#RUN . ~/.bashrc && conda activate bevdet_docker && cd /root/bevdet && pip install -v -e .
-
+RUN . ~/.bashrc && conda activate cr3dt_docker && pip install mmcv-full==1.5.3 -f https://download.openmmlab.com/mmcv/dist/cu113/torch1.10.0/index.html

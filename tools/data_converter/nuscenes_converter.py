@@ -166,7 +166,7 @@ def get_available_scenes(nusc):
 
 def get_lidar_img_info(cam_path):
     sting_list = cam_path.split('/')
-    sting_list[2] = 'nuscenes_out_test'
+    sting_list[2] = 'nuscenes_test'
     if '.jpg' in sting_list[-1]:
         sting_list[-1] = sting_list[-1].replace('.jpg','.png')
     else: 
@@ -180,7 +180,7 @@ def get_lidar_img_info(cam_path):
 
 def get_radar_img_info(cam_path):
     sting_list = cam_path.split('/')
-    sting_list[2] = 'nuscenes_out_test'
+    sting_list[2] = 'nuscenes_test'
     if '.jpg' in sting_list[-1]:
         sting_list[-1] = sting_list[-1].replace('.jpg','.png')
     else: 

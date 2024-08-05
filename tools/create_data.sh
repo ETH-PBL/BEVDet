@@ -4,7 +4,7 @@
 conda activate bevdet_test
 
 # For TrainVal
-python tools/create_data_bevdet.py nuscenes --root-path ./data/nuscenes --out-dir ./data/nuscenes_out --extra-tag bevdetv2-nuscenes
+python tools/create_data_bevdet.py nuscenes --root-path ./data/nuscenes --out-dir ./data/nuscenes --extra-tag bevdetv2-nuscenes
 
 # For Test
-python tools/create_data_bevdet.py nuscenes --root-path ./data/nuscenes_test --out-dir ./data/nuscenes_out_test --extra-tag bevdetv2-nuscenes --version v1.0-test
+python tools/create_data_bevdet.py nuscenes --root-path ./data/nuscenes_test --out-dir ./data/nuscenes_test --extra-tag bevdetv2-nuscenes --version v1.0-test
