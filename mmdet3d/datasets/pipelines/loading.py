@@ -511,10 +511,8 @@ class LoadRadarPointsFromFile(object):
     """
 
     def __init__(self,
-                 sweeps_num=10,
-                 qd_tracking=False):
+                 sweeps_num=10):
         self.sweeps_num = sweeps_num  
-        self.qd_tracking = qd_tracking
 
     def _load_radar_points(self, radar_pcl):
         """Private function to load point clouds data.
@@ -570,15 +568,6 @@ class LoadRadarPointsFromFile(object):
         radar = points_class(
             radar, points_dim=radar.shape[-1])
         results['radar'] = radar
-
-        if self.qd_tracking:
-            radar_ref = self._load_radar_points(results['reference'][0]['radar_pcl'])
-            radar_ref[:,:3] = (bda_rot @ radar_ref[:,:3].T).T
-            # Treat radar same as a LIDAR point cloud
-            points_class = get_points_type('LIDAR')
-            radar_ref = points_class(
-                radar_ref, points_dim=radar_ref.shape[-1])
-            results['radar_ref'] = radar_ref
 
         return results
 
@@ -926,13 +915,11 @@ class PrepareImageInputs(object):
         data_config,
         is_train=False,
         sequential=False,
-        qd_tracking=False,
     ):
         self.is_train = is_train
         self.data_config = data_config
         self.normalize_img = mmlabNormalize
         self.sequential = sequential
-        self.qd_tracking = qd_tracking
 
     def get_rot(self, h):
         return torch.Tensor([
@@ -1095,55 +1082,6 @@ class PrepareImageInputs(object):
                         rotate=rotate)
                     imgs.append(self.normalize_img(img_adjacent))
 
-        if self.qd_tracking:
-            assert 'reference' in results, \
-                'reference images info required for qd tracking'
-            for ref_info in results['reference']:
-                # cycle again through cameras and append reference images
-                for cam_name in cam_names:
-                    cam_data = ref_info['cams'][cam_name]
-                    filename = cam_data['data_path']
-                    img = Image.open(filename)
-                    post_rot = torch.eye(2)
-                    post_tran = torch.zeros(2)
-
-                    intrin = torch.Tensor(cam_data['cam_intrinsic'])
-
-                    sensor2ego, ego2global = \
-                        self.get_sensor_transforms(ref_info, cam_name)
-                    
-                    # image view augmentation (resize, crop, horizontal flip, rotate)
-                    # NOTE: transforms are applied to reference images resampling, 
-                    # i.e. the transformation might be different from the one
-                    # applied to the standard image
-                    img_augs = self.sample_augmentation(
-                        H=img.height, W=img.width, flip=flip, scale=scale)
-                    resize, resize_dims, crop, flip, rotate = img_augs
-                    img, post_rot2, post_tran2 = \
-                        self.img_transform(img, post_rot,
-                                        post_tran,
-                                        resize=resize,
-                                        resize_dims=resize_dims,
-                                        crop=crop,
-                                        flip=flip,
-                                        rotate=rotate)
-
-                    # for convenience, make augmentation matrices 3x3
-                    post_tran = torch.zeros(3)
-                    post_rot = torch.eye(3)
-                    post_tran[:2] = post_tran2
-                    post_rot[:2, :2] = post_rot2
-
-                    canvas.append(np.array(img))
-                    imgs.append(self.normalize_img(img))
-
-                    intrins.append(intrin)
-                    sensor2egos.append(sensor2ego)
-                    ego2globals.append(ego2global)
-                    post_rots.append(post_rot)
-                    post_trans.append(post_tran)
-
-        # not sure why adjacent meta data is here out of the loop
         if self.sequential:
             for adj_info in results['adjacent']:
                 post_trans.extend(post_trans[:len(cam_names)])
@@ -1271,7 +1209,6 @@ class LoadAnnotationsBEVDepth(object):
                 LiDARInstance3DBoxes(gt_boxes_ref, box_dim=gt_boxes_ref.shape[-1],
                                      origin=(0.5, 0.5, 0.5))
             results['gt_labels_3d_ref'] = gt_labels_ref
-        # print(f"What are the dimensions? {len(results['gt_bboxes_3d'])} {len(results['gt_bboxes_3d_ref'])}", file=open("debug.txt", "a"))
 
 
         imgs, rots, trans, intrins = results['img_inputs'][:4]

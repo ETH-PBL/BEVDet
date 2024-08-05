@@ -104,7 +104,7 @@ def parse_args():
     parser.add_argument(
         '--wandb',
         type=str,
-        default='online',
+        default='disabled',
         help='Enable wandb logging. Options: online, offline, disabled')
     parser.add_argument(
         '--wandbnotes',
@@ -198,7 +198,6 @@ def main():
     log_file = osp.join(cfg.work_dir, f'{timestamp}.log')
     # specify logger name, if we still use 'mmdet', the output info will be
     # filtered and won't be saved in the log_file
-    # TODO: ugly workaround to judge whether we are training det or seg model
     if cfg.model.type in ['EncoderDecoder3D']:
         logger_name = 'mmseg'
     else:
@@ -220,7 +219,6 @@ def main():
 
     # log some basic info
     logger.info(f'Distributed training: {distributed}')
-    # logger.info(f'Config:\n{cfg.pretty_text}')
 
     # set random seeds
     seed = init_random_seed(args.seed)
