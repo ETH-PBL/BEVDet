@@ -21,6 +21,7 @@
 
 import math
 
+_base_ = ['./cr3dt-r50.py']
 
 # If point cloud range is changed, the models should also change their point
 # cloud range accordingly
@@ -53,7 +54,7 @@ data_config = {
 
 # Data
 dataset_type = 'NuScenesDataset'
-data_root = 'data/nuscenes/v1_0-test/'
+data_root = 'data/nuscenes_test/'
 data_root_pkl = 'data/nuscenes_test/'
 file_client_args = dict(backend='disk')
 

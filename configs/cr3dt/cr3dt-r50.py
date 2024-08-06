@@ -278,8 +278,8 @@ data_root_pkl = 'data/nuscenes/'
 file_client_args = dict(backend='disk')
 
 #For mini uncomment this
-data_root = 'data/nuscenes_mini/'
-data_root_pkl = 'data/nuscenes_mini/'
+# data_root = 'data/nuscenes_mini/'
+# data_root_pkl = 'data/nuscenes_mini/'
 
 bda_aug_conf = dict(
     rot_lim=(-22.5, 22.5),

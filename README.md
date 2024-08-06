@@ -8,7 +8,7 @@ This is the official code implementation to the paper [CR3DT: Camera-Radar 3D Tr
 
 Step 1. Clone this repository.
 ```shell script
-git clone git@github.com:ETH-PBL/BEVDet.git
+git clone git@github.com:ETH-PBL/CR3DT.git
 ```
 
 Step 2. Use the provided docker file to create the needed container [Docker](docker/Dockerfile).
