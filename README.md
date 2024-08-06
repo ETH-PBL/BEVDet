@@ -45,11 +45,11 @@ Step 6. Prepare nuScenes dataset as introduced in [nuscenes_det.md](docs/en/data
 ```shell script
 ./tools/create_data.sh trainval # mini, test
 ```
-
-
 **Note**: this package requires the BEV boxes to be in the format `[x_center, y_center, w, h, yaw]`. The `LiDARInstance3DBoxes` from `mmdet3d` are with "bottom center" origin.
 
 **Note**: To train or evaluate on the mini dataset, [the `cr3dt-r50.py` config](configs/cr3dt/cr3dt-r50.py#L258) needs to be adapted accordingly (see comment in file).
+
+Step 7: To run the tracking evaluations follow the instructions on [CC-3DT++](https://github.com/ETH-PBL/cc-3dt-pp).
 
 #### Train model
 ```shell
@@ -106,7 +106,7 @@ This project is not possible without multiple great open-sourced code bases. We 
 
 If this work is helpful for your research, please consider citing the following BibTeX entry.
 
-```
+```bibtex
 @article{baumann2024cr3dt,
   title={CR3DT: Camera-RADAR Fusion for 3D Detection and Tracking},
   author={Baumann, Nicolas and Baumgartner, Michael and Ghignone, Edoardo and K{\"u}hne, Jonas and Fischer, Tobias and Yang, Yung-Hsu and Pollefeys, Marc and Magno, Michele},
