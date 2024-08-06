@@ -1,23 +1,24 @@
-# mAP: -
-# mATE: -
-# mASE: -
-# mAOE: -
-# mAVE: -
-# mAAE: -
-# NDS: -
-#
+# mAP: 0.3515                                                                                                                                                                                          
+# mATE: 0.6431
+# mASE: 0.2907
+# mAOE: 0.5936
+# mAVE: 0.4708
+# mAAE: 0.1982
+# NDS: 0.4561
+# Eval time: 44.0s
+
 # Per-class results:
-# Object Class	AP	ATE	ASE	AOE	AVE	AAE
-# car	
-# truck	
-# bus	
-# trailer	
-# construction_vehicle	
-# pedestrian	
-# motorcycle	
-# bicycle	
-# traffic_cone	
-# barrier	
+# Object Class    AP      ATE     ASE     AOE     AVE     AAE
+# car     0.656   0.370   0.161   0.100   0.434   0.196
+# truck   0.308   0.589   0.223   0.159   0.348   0.219
+# bus     0.385   0.718   0.220   0.122   0.768   0.201
+# trailer 0.141   0.982   0.244   0.506   0.256   0.064
+# construction_vehicle    0.100   0.873   0.519   1.253   0.113   0.369
+# pedestrian      0.402   0.678   0.309   0.983   0.696   0.286
+# motorcycle      0.300   0.598   0.283   0.878   0.655   0.232
+# bicycle 0.240   0.566   0.293   1.190   0.496   0.020
+# traffic_cone    0.525   0.500   0.353   nan     nan     nan
+# barrier 0.458   0.556   0.302   0.151   nan     nan
 
 
 #ON MINI:
