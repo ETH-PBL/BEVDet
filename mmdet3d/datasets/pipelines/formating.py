@@ -50,7 +50,7 @@ class DefaultFormatBundle(object):
                 results['img'] = DC(to_tensor(img), stack=True)
         for key in [
                 'proposals', 'gt_bboxes', 'gt_bboxes_ignore', 'gt_labels',
-                'gt_labels_3d', 'attr_labels', 'pts_instance_mask',
+                'gt_labels_3d', 'gt_labels_3d_ref', 'attr_labels', 'pts_instance_mask',
                 'pts_semantic_mask', 'centers2d', 'depths'
         ]:
             if key not in results:
@@ -66,12 +66,28 @@ class DefaultFormatBundle(object):
             else:
                 results['gt_bboxes_3d'] = DC(
                     to_tensor(results['gt_bboxes_3d']))
+        if 'gt_bboxes_3d_ref' in results:
+            if isinstance(results['gt_bboxes_3d_ref'], BaseInstance3DBoxes):
+                results['gt_bboxes_3d_ref'] = DC(
+                    results['gt_bboxes_3d_ref'], cpu_only=True)
+            else:
+                results['gt_bboxes_3d_ref'] = DC(
+                    to_tensor(results['gt_bboxes_3d_ref']))
 
         if 'gt_masks' in results:
             results['gt_masks'] = DC(results['gt_masks'], cpu_only=True)
         if 'gt_semantic_seg' in results:
             results['gt_semantic_seg'] = DC(
                 to_tensor(results['gt_semantic_seg'][None, ...]), stack=True)
+            
+        if 'gt_match_indices' in results:
+            results['gt_match_indices'] = DC(to_tensor(results['gt_match_indices']))
+        
+        if 'instance_ids_key' in results:
+            results['instance_ids_key'] = DC(to_tensor(results['instance_ids_key']), cpu_only=True)
+
+        if 'instance_ids_ref' in results:
+            results['instance_ids_ref'] = DC(to_tensor(results['instance_ids_ref']), cpu_only=True)
 
         return results
 
@@ -207,6 +223,14 @@ class DefaultFormatBundle3D(DefaultFormatBundle):
             assert isinstance(results['points'], BasePoints)
             results['points'] = DC(results['points'].tensor)
 
+        if 'radar' in results:
+            assert isinstance(results['radar'], BasePoints)
+            results['radar'] = DC(results['radar'].tensor)
+
+        if 'radar_ref' in results:
+            assert isinstance(results['radar_ref'], BasePoints)
+            results['radar_ref'] = DC(results['radar_ref'].tensor)
+
         for key in ['voxels', 'coors', 'voxel_centers', 'num_points']:
             if key not in results:
                 continue
@@ -226,6 +250,19 @@ class DefaultFormatBundle3D(DefaultFormatBundle):
                         gt_bboxes_3d_mask]
                 if 'depths' in results:
                     results['depths'] = results['depths'][gt_bboxes_3d_mask]
+            if 'gt_bboxes_3d_mask_ref' in results:
+                gt_bboxes_3d_mask_ref = results['gt_bboxes_3d_mask_ref']
+                results['gt_bboxes_3d_ref'] = results['gt_bboxes_3d_ref'][
+                    gt_bboxes_3d_mask_ref]
+                if 'gt_names_3d_ref' in results:
+                    results['gt_names_3d_ref'] = results['gt_names_3d_ref'][
+                        gt_bboxes_3d_mask_ref]
+                if 'centers2d_ref' in results:
+                    results['centers2d_ref'] = results['centers2d_ref'][
+                        gt_bboxes_3d_mask_ref]
+                if 'depths_ref' in results:
+                    results['depths_ref'] = results['depths_ref'][gt_bboxes_3d_mask_ref]
+            
             if 'gt_bboxes_mask' in results:
                 gt_bboxes_mask = results['gt_bboxes_mask']
                 if 'gt_bboxes' in results:
@@ -253,6 +290,12 @@ class DefaultFormatBundle3D(DefaultFormatBundle):
                     results['gt_labels_3d'] = np.array([
                         self.class_names.index(n)
                         for n in results['gt_names_3d']
+                    ],
+                                                       dtype=np.int64)
+                if 'gt_names_3d_ref' in results:
+                    results['gt_labels_3d_ref'] = np.array([
+                        self.class_names.index(n)
+                        for n in results['gt_names_3d_ref']
                     ],
                                                        dtype=np.int64)
         results = super(DefaultFormatBundle3D, self).__call__(results)

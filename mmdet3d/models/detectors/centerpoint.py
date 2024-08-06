@@ -13,6 +13,7 @@ class CenterPoint(MVXTwoStageDetector):
     def __init__(self,
                  pts_voxel_layer=None,
                  pts_voxel_encoder=None,
+                 radar_voxel_encoder=None,
                  pts_middle_encoder=None,
                  pts_fusion_layer=None,
                  img_backbone=None,
@@ -27,7 +28,7 @@ class CenterPoint(MVXTwoStageDetector):
                  pretrained=None,
                  init_cfg=None):
         super(CenterPoint,
-              self).__init__(pts_voxel_layer, pts_voxel_encoder,
+              self).__init__(pts_voxel_layer, pts_voxel_encoder, radar_voxel_encoder,
                              pts_middle_encoder, pts_fusion_layer,
                              img_backbone, pts_backbone, img_neck, pts_neck,
                              pts_bbox_head, img_roi_head, img_rpn_head,
@@ -58,7 +59,8 @@ class CenterPoint(MVXTwoStageDetector):
                           gt_bboxes_3d,
                           gt_labels_3d,
                           img_metas,
-                          gt_bboxes_ignore=None):
+                          gt_bboxes_ignore=None,
+                          bbox_bool=False):
         """Forward function for point cloud branch.
 
         Args:
@@ -77,7 +79,11 @@ class CenterPoint(MVXTwoStageDetector):
         outs = self.pts_bbox_head(pts_feats)
         loss_inputs = [gt_bboxes_3d, gt_labels_3d, outs]
         losses = self.pts_bbox_head.loss(*loss_inputs)
-        return losses
+        bbox_list = self.pts_bbox_head.get_bboxes(outs, img_metas, rescale=False, do_nms=False)
+        if bbox_bool:
+            return losses, bbox_list
+        else:
+            return losses
 
     def simple_test_pts(self, x, img_metas, rescale=False):
         """Test function of point cloud branch."""
@@ -88,7 +94,7 @@ class CenterPoint(MVXTwoStageDetector):
             bbox3d2result(bboxes, scores, labels)
             for bboxes, scores, labels in bbox_list
         ]
-        return bbox_results
+        return bbox_results, bbox_list
 
     def aug_test_pts(self, feats, img_metas, rescale=False):
         """Test function of point cloud branch with augmentaiton.

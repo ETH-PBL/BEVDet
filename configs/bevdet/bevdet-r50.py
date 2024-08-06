@@ -161,8 +161,13 @@ model = dict(
 
 # Data
 dataset_type = 'NuScenesDataset'
-data_root = 'data/nuscenes/'
+data_root = 'data/nuscenes/v1_0-test/'
+data_root_pkl = 'data/nuscenes/'
 file_client_args = dict(backend='disk')
+
+#For mini uncomment this
+# data_root = 'data/nuscenes_mini/'
+# data_root_pkl = 'data/nuscenes_mini/'
 
 bda_aug_conf = dict(
     rot_lim=(-22.5, 22.5),
@@ -179,11 +184,17 @@ train_pipeline = [
         type='LoadAnnotationsBEVDepth',
         bda_aug_conf=bda_aug_conf,
         classes=class_names),
+    dict(
+        type='LoadPointsFromFile',
+        coord_type='LIDAR',
+        load_dim=5,
+        use_dim=5,
+        file_client_args=file_client_args),
     dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='ObjectNameFilter', classes=class_names),
     dict(type='DefaultFormatBundle3D', class_names=class_names),
     dict(
-        type='Collect3D', keys=['img_inputs', 'gt_bboxes_3d', 'gt_labels_3d'])
+        type='Collect3D', keys=['img_inputs', 'points', 'gt_bboxes_3d', 'gt_labels_3d'])
 ]
 
 test_pipeline = [
@@ -214,7 +225,7 @@ test_pipeline = [
 ]
 
 input_modality = dict(
-    use_lidar=False,
+    use_lidar=True,
     use_camera=True,
     use_radar=False,
     use_map=False,
@@ -229,14 +240,15 @@ share_data_config = dict(
 
 test_data_config = dict(
     pipeline=test_pipeline,
-    ann_file=data_root + 'bevdetv2-nuscenes_infos_val.pkl')
+    data_root=data_root,
+    ann_file=data_root_pkl + 'bevdetv2-nuscenes_infos_test.pkl')
 
 data = dict(
     samples_per_gpu=8,
     workers_per_gpu=4,
     train=dict(
         data_root=data_root,
-        ann_file=data_root + 'bevdetv2-nuscenes_infos_train.pkl',
+        ann_file=data_root_pkl + 'bevdetv2-nuscenes_infos_train.pkl',
         pipeline=train_pipeline,
         classes=class_names,
         test_mode=False,
@@ -269,4 +281,7 @@ custom_hooks = [
     ),
 ]
 
+# Sets eval interval, THIS HAS TO BE THE SAME as in the Checkpoint interval!
+evaluation = dict(interval=5)
+checkpoint_config = dict(interval=5)
 # fp16 = dict(loss_scale='dynamic')

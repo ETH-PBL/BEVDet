@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import numpy as np
 import torch
 from mmcv.cnn import build_norm_layer
 from mmcv.ops import DynamicScatter
@@ -8,6 +9,117 @@ from torch import nn
 from ..builder import VOXEL_ENCODERS
 from .utils import PFNLayer, get_paddings_indicator
 
+
+# Copyright (c) PBL Lab ETHZ
+@VOXEL_ENCODERS.register_module()
+class RadarPillarFE(nn.Module):
+    """Simple radar feature encoder used in SimpleBEV
+
+    It simply takes all the pre-processed features of the radar point cloud and rasterizes them into a grid.
+
+    Args:
+        grid_config (dict[List]): lower, upper & interval of the x, y, z dimension of the grid.
+    """
+    def __init__(self, grid_config, transpose=False, rot=False, rot_angle=0, radar_feat_dim=18) -> None:
+        super(RadarPillarFE, self).__init__()
+        self.grid_config = grid_config
+        self.transpose = transpose
+        self.rot = rot
+        self.rot_angle = rot_angle
+        self.radar_feat_dim = radar_feat_dim
+    
+    @force_fp32(out_fp16=True)
+    def forward(self, points):
+        """Voxelize the points and build a feature grid per batch with the pre-processed radar data.
+
+        Args:
+            points (list[torch.Tensor]): List of radar point clouds with shape (B, N, radar_features).
+                                         Radar features are typically x,y,z,+15 dimensions.
+        
+        Returns:
+            The feature grid with shape (B, radar_feats_dim * Z, Y, X) with B being the batch size.
+        """
+        batch_size = len(points)
+        x_min, x_max = self.grid_config['x'][:2]
+        num_x_bins = int((x_max - x_min) / self.grid_config['x'][2])
+        y_min, y_max = self.grid_config['y'][:2]
+        num_y_bins = int((y_max - y_min) / self.grid_config['y'][2])
+        z_min, z_max = self.grid_config['z'][:2]
+        num_z_bins = int((z_max - z_min) / self.grid_config['z'][2])
+        bev_shape = (num_z_bins, num_y_bins, num_x_bins) # Typically (1, 128, 128)
+        bev_feat_shape = (num_z_bins, num_y_bins, num_x_bins, self.radar_feat_dim) # (1, 128, 128, radar_feats_dim) -> typically 18
+        feature_grid = torch.zeros((batch_size,) + bev_feat_shape, dtype=torch.float32, device=points[0].device)
+        # Counts the number of points in each voxel for the running average
+        counter_grid = torch.zeros((batch_size,) + bev_shape, dtype=torch.float32, device=points[0].device)
+
+        scale_x = bev_shape[2] / (x_max - x_min)
+        scale_y = bev_shape[1] / (y_max - y_min)
+        scale_z = bev_shape[0] / (z_max - z_min)
+
+        # rotation matrix for rotation around z-axis
+        R = np.array([[np.cos(self.rot_angle), -np.sin(self.rot_angle), 0], 
+                    [np.sin(self.rot_angle), np.cos(self.rot_angle), 0],
+                    [0, 0, 1]])
+
+        # Point shape is (B, N, x, y, z, ...)
+        for batch_idx in range(batch_size):
+            single_batch_points = points[batch_idx]
+
+            if self.transpose:
+                # transpose points
+                single_batch_points[:, [0, 1, 2]] = single_batch_points[:, [1, 0, 2]]
+
+            if self.rot:
+                # rotate points
+                rotated_points = np.dot(R, single_batch_points[:, :3].cpu().numpy().T).T
+                single_batch_points[:, :3] = torch.from_numpy(rotated_points).to(single_batch_points.device)
+
+            # filter points outside range
+            mask = ((single_batch_points[:, 0] >= x_min) & (single_batch_points[:, 0] <= x_max) &
+                    (single_batch_points[:, 1] >= y_min) & (single_batch_points[:, 1] <= y_max) &
+                    (single_batch_points[:, 2] >= z_min) & (single_batch_points[:, 2] <= z_max))
+            single_batch_points = single_batch_points[mask]
+
+            # if no points are left after filtering, continue
+            if len(single_batch_points) == 0:
+                continue
+
+            # translate points to start in bin (0,0,0)
+            single_batch_points[:, 0] -= x_min
+            single_batch_points[:, 1] -= y_min
+            single_batch_points[:, 2] -= z_min
+
+            # Rescale points to fit the bev grid
+            single_batch_points[:, 0] *= scale_x
+            single_batch_points[:, 1] *= scale_y
+            single_batch_points[:, 2] *= scale_z
+
+            # Get indices for assignment -> round down
+            indices = single_batch_points[:, :3].type(torch.long)
+
+            # Clamp indices to bev_shape, as some points may fall outside the last voxel due to rounding errors
+            indices[:, 0] = indices[:, 0].clamp(0, bev_shape[2] - 1)
+            indices[:, 1] = indices[:, 1].clamp(0, bev_shape[1] - 1)
+            indices[:, 2] = indices[:, 2].clamp(0, bev_shape[0] - 1)
+
+            # Save the pre-processed features in the corresponding voxel with a running average
+            counter_grid[batch_idx, indices[:, 2], indices[:, 1], indices[:, 0]] += 1.0
+            # Change the number of features extracted from the radar data here (in single_batch_points[:, 18-#features:]) -> automated now
+            feature_grid[batch_idx, indices[:, 2], indices[:, 1], indices[:, 0], :] = \
+                feature_grid[batch_idx, indices[:, 2], indices[:, 1], indices[:, 0], :] + \
+                (single_batch_points[:, 18 - self.radar_feat_dim:].type(torch.float32) - \
+                feature_grid[batch_idx, indices[:, 2], indices[:, 1], indices[:, 0], :]) / \
+                counter_grid[batch_idx, indices[:, 2], indices[:, 1], indices[:, 0]].unsqueeze(1)
+            
+
+        # Need to stack the features into the expected shape of (B, radar_feat_dim * Z, Y, X) from (B, Z, Y, X, radar_feat_dim)
+        feature_grid = feature_grid.permute(0, 4, 1, 2, 3).contiguous()
+        feature_grid = feature_grid.view(batch_size, self.radar_feat_dim * num_z_bins, num_y_bins, num_x_bins)
+
+
+        return feature_grid
+
+    
 
 @VOXEL_ENCODERS.register_module()
 class PillarFeatureNet(nn.Module):

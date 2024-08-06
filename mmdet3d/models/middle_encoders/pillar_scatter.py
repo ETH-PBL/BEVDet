@@ -1,4 +1,6 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import os
+os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
 import torch
 from mmcv.runner import auto_fp16
 from torch import nn

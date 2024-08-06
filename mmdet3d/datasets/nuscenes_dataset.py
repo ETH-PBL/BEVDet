@@ -111,7 +111,6 @@ class NuScenesDataset(Custom3DDataset):
         'vehicle.parked',
         'vehicle.stopped',
     ]
-    # https://github.com/nutonomy/nuscenes-devkit/blob/57889ff20678577025326cfc24e57424a829be0a/python-sdk/nuscenes/eval/detection/evaluate.py#L222 # noqa
     ErrNameMapping = {
         'trans_err': 'mATE',
         'scale_err': 'mASE',
@@ -230,10 +229,12 @@ class NuScenesDataset(Custom3DDataset):
                 - ann_info (dict): Annotation info.
         """
         info = self.data_infos[index]
+        # NOTE info['ann_infos'][2] contains the instance_tokens
+
         # standard protocol modified from SECOND.Pytorch
         input_dict = dict(
             sample_idx=info['token'],
-            pts_filename=info['lidar_path'],
+            pts_filename=info['lidar_path'], 
             sweeps=info['sweeps'],
             timestamp=info['timestamp'] / 1e6,
         )
@@ -275,6 +276,30 @@ class NuScenesDataset(Custom3DDataset):
                 if '4d' in self.img_info_prototype:
                     info_adj_list = self.get_adj_info(info, index)
                     input_dict.update(dict(adjacent=info_adj_list))
+                if 'QD' in self.img_info_prototype:
+                    info_ref_list = self.get_ref_info(info, index, scope=5)
+                    input_dict.update(dict(reference=info_ref_list))
+                    if not self.test_mode:
+                        if 'ann_infos' in input_dict['reference'][0]:
+                            input_dict['ann_infos_ref'] = input_dict['reference'][0]['ann_infos']
+                    
+                    input_dict['curr']['instance_ids'] = info['ann_infos'][2]
+                    for i, inst_id in enumerate(input_dict['curr']['instance_ids']):
+                        # convert hex to int
+                        if len(str(inst_id)) > 17:
+                            input_dict['curr']['instance_ids'][i] = int(str(inst_id)[:14], 16)
+
+                    input_dict['reference'][0]['instance_ids'] = info_ref_list[0]['ann_infos'][2]
+                    for i, inst_id in enumerate(input_dict['reference'][0]['instance_ids']):
+                        # convert hex to int
+                        if len(str(inst_id)) > 17:
+                            input_dict['reference'][0]['instance_ids'][i] = int(str(inst_id)[:14], 16)
+
+                    (input_dict['curr']['match_indices'],
+                      input_dict['reference'][0]['match_indices']) = self.match_ids(
+                                                        input_dict['curr'],
+                                                        input_dict['reference'][0])
+
         return input_dict
 
     def get_adj_info(self, info, index):
@@ -292,6 +317,73 @@ class NuScenesDataset(Custom3DDataset):
             else:
                 info_adj_list.append(self.data_infos[select_id])
         return info_adj_list
+    
+    def get_ref_info(self, info, index, scope):
+        """
+        Get info for a refernce frame, where the 'reference' is a uniformly sampled fram 
+        in style of Quasi Dense Tracking
+
+        Args:
+            info (dict): data info
+            index (int): index of the current frame
+            scope (int): number of frames to sample from
+        
+        Returns:    
+            info_ref_list (list): list of reference frame info
+        """ 
+        info_ref_list = []
+        # create list of indices to sample from
+        range_extremes = [max(index - scope, 0), min(index + scope, len(self.data_infos) - 1)]
+
+        # then filter out points at the extremes if they are not in the same scene
+        tmp_range_extremes = range_extremes
+        for i in range(range_extremes[0], index):
+            if self.data_infos[i]['scene_token'] == info['scene_token']:
+                break
+            else:
+                tmp_range_extremes[0] += 1
+        for i in range(range_extremes[1], index, -1):
+            if self.data_infos[i]['scene_token'] == info['scene_token']:
+                break
+            else:
+                tmp_range_extremes[1] -= 1
+        range_extremes = tmp_range_extremes
+
+        # sample a frame from the range, excluding the current frame
+        left_part = list(range(range_extremes[0], index))
+        right_part = list(range(index + 1, range_extremes[1]))
+        sample_range = left_part + right_part
+        sample_id = np.random.choice(sample_range)
+        
+        # get info for the sampled frame
+        info_ref = self.data_infos[sample_id]
+        info_ref_list.append(info_ref)
+        
+        return info_ref_list
+    
+    def match_ids(self, ann_info, ann_info_ref):
+        """Matches IDs of ground truth boxes between key and reference frames
+        """
+        if 'instance_ids' in ann_info:
+            ins_ids = list(ann_info['instance_ids'])
+            ref_ins_ids = list(ann_info_ref['instance_ids'])
+            match_indices = np.array([
+                ref_ins_ids.index(i) if i in ref_ins_ids else -1
+                for i in ins_ids
+            ])
+            ref_match_indices = np.array([
+                ins_ids.index(i) if i in ins_ids else -1 for i in ref_ins_ids
+            ])
+            if sum(match_indices) <= -len(match_indices) and sum(match_indices) != 0:
+                print(f"Match indices: {match_indices}")
+                print(f"Ref match indices: {ref_match_indices}")
+                print(f"Ins ids: {ins_ids}")
+                print(f"Ref ins ids: {ref_ins_ids}")
+        else:
+            match_indices = np.arange(ann_info['bboxes'].shape[0], dtype=np.int64)
+            ref_match_indices = match_indices.copy()
+        return match_indices, ref_match_indices
+
 
     def get_ann_info(self, index):
         """Get annotation info according to the given index.
@@ -362,6 +454,10 @@ class NuScenesDataset(Custom3DDataset):
             boxes = det['boxes_3d'].tensor.numpy()
             scores = det['scores_3d'].numpy()
             labels = det['labels_3d'].numpy()
+            if 'embeddings' in det:
+                embeddings = det['embeddings'].numpy()
+            else:
+                embeddings = np.zeros_like(scores)
             sample_token = self.data_infos[sample_id]['token']
 
             trans = self.data_infos[sample_id]['cams'][
@@ -411,6 +507,7 @@ class NuScenesDataset(Custom3DDataset):
                     detection_name=name,
                     detection_score=float(scores[i]),
                     attribute_name=attr,
+                    embedding=embeddings[i],
                 )
                 annos.append(nusc_anno)
             # other views results of the same frame should be concatenated
@@ -455,6 +552,7 @@ class NuScenesDataset(Custom3DDataset):
         nusc = NuScenes(
             version=self.version, dataroot=self.data_root, verbose=False)
         eval_set_map = {
+            'v1.0-test': 'test',
             'v1.0-mini': 'mini_val',
             'v1.0-trainval': 'val',
         }
@@ -666,10 +764,6 @@ def output_to_nusc_box(detection, with_velocity=True):
             velocity = (*box3d.tensor[i, 7:9], 0.0)
         else:
             velocity = (0, 0, 0)
-        # velo_val = np.linalg.norm(box3d[i, 7:9])
-        # velo_ori = box3d[i, 6]
-        # velocity = (
-        # velo_val * np.cos(velo_ori), velo_val * np.sin(velo_ori), 0.0)
         box = NuScenesBox(
             box_gravity_center[i],
             nus_box_dims[i],

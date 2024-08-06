@@ -12,6 +12,8 @@ from mmdet.datasets.pipelines import LoadAnnotations, LoadImageFromFile
 from ...core.bbox import LiDARInstance3DBoxes
 from ..builder import PIPELINES
 
+from nuscenes.utils.data_classes import RadarPointCloud, transform_matrix
+
 @PIPELINES.register_module()
 class LoadOccGTFromFile(object):
     def __call__(self, results):
@@ -436,7 +438,7 @@ class LoadPointsFromFile(object):
                 points = np.fromfile(pts_filename, dtype=np.float32)
 
         return points
-
+    
     def __call__(self, results):
         """Call function to load points data from file.
 
@@ -474,11 +476,16 @@ class LoadPointsFromFile(object):
                     points.shape[1] - 1,
                 ]))
 
+        trans = results['curr']['lidar2ego_translation']
+        rot = np.array(Quaternion(results['curr']['lidar2ego_rotation']).rotation_matrix)
+        points[:,:3] =  ((rot @ points[:,:3].T)).T + np.array(trans)
+
+        bda_rot = results['img_inputs'][6]
+        points[:,:3] = (bda_rot @ points[:,:3].T).T
         points_class = get_points_type(self.coord_type)
         points = points_class(
             points, points_dim=points.shape[-1], attribute_dims=attribute_dims)
         results['points'] = points
-
         return results
 
     def __repr__(self):
@@ -489,6 +496,85 @@ class LoadPointsFromFile(object):
         repr_str += f'file_client_args={self.file_client_args}, '
         repr_str += f'load_dim={self.load_dim}, '
         repr_str += f'use_dim={self.use_dim})'
+        return repr_str
+
+
+@PIPELINES.register_module()
+class LoadRadarPointsFromFile(object):
+    """Load Points From File.
+
+    Load radar points from file, with the option to utilize previous 
+    sweeps on the nuScenes dataset.
+
+    Args:
+        sweeps_num (int, optional): Number of additional sweeps. Defaults to 10.
+    """
+
+    def __init__(self,
+                 sweeps_num=10):
+        self.sweeps_num = sweeps_num  
+
+    def _load_radar_points(self, radar_pcl):
+        """Private function to load point clouds data.
+
+        Args:
+            radar_pcl (dict): Custom dict containing filepath and extrinsics for the radars
+
+        Returns:
+            np.ndarray: An array containing point clouds data.
+        """
+        points = np.zeros((18, 0)) # 18 plus one for time
+        for radar_name in radar_pcl:
+
+            # Code from SimpleBEV
+            current_sd_rec = radar_pcl[radar_name]
+
+            current_pc = RadarPointCloud.from_file(current_sd_rec['filename'])
+
+            current_cs_rec = current_sd_rec['calibrated_sensor']
+            car_from_current = transform_matrix(current_cs_rec['translation'], Quaternion(current_cs_rec['rotation']),
+                                                inverse=False)
+            current_pc.transform(car_from_current)
+
+            new_points = (current_pc.points)
+            # Adding additional sweeps of self.sweeps_num > 0
+            nsweep = min(self.sweeps_num, len(current_sd_rec['sweep_paths']))
+            for index in range(nsweep):
+                filename = current_sd_rec['sweep_paths'][index]
+                current_pc = RadarPointCloud.from_file(filename)
+                current_pc.transform(car_from_current)
+                new_points = np.concatenate((new_points,current_pc.points),1)
+
+            points = np.concatenate((points, new_points), 1)
+        return points.T
+
+    def __call__(self, results):
+        """Call function to load points data from file.
+
+        Args:
+            results (dict): Result dict containing point clouds data.
+
+        Returns:
+            dict: The result dict containing the point clouds data.
+                Added key and value are described below.
+
+                - radar (:obj:`BasePoints`): Radar point clouds data (optionally from multiple sweeps).
+        """
+        bda_rot = results['img_inputs'][6]
+        radar = self._load_radar_points(results['curr']['radar_pcl'])
+        radar[:,:3] = (bda_rot @ radar[:,:3].T).T
+        # Treat radar same as a LIDAR point cloud
+        points_class = get_points_type('LIDAR')
+        radar = points_class(
+            radar, points_dim=radar.shape[-1])
+        results['radar'] = radar
+
+        return results
+
+    def __repr__(self):
+        """str: Return a string that describes the module."""
+        repr_str = self.__class__.__name__ + '('
+        repr_str += f'sweeps_num={self.sweeps_num})'
         return repr_str
 
 
@@ -976,6 +1062,13 @@ class PrepareImageInputs(object):
             canvas.append(np.array(img))
             imgs.append(self.normalize_img(img))
 
+            intrins.append(intrin)
+            sensor2egos.append(sensor2ego)
+            ego2globals.append(ego2global)
+            post_rots.append(post_rot)
+            post_trans.append(post_tran)
+
+            # handle adjacent images
             if self.sequential:
                 assert 'adjacent' in results
                 for adj_info in results['adjacent']:
@@ -988,11 +1081,6 @@ class PrepareImageInputs(object):
                         flip=flip,
                         rotate=rotate)
                     imgs.append(self.normalize_img(img_adjacent))
-            intrins.append(intrin)
-            sensor2egos.append(sensor2ego)
-            ego2globals.append(ego2global)
-            post_rots.append(post_rot)
-            post_trans.append(post_tran)
 
         if self.sequential:
             for adj_info in results['adjacent']:
@@ -1077,21 +1165,52 @@ class LoadAnnotationsBEVDepth(object):
         return gt_boxes, rot_mat
 
     def __call__(self, results):
-        gt_boxes, gt_labels = results['ann_infos']
-        gt_boxes, gt_labels = torch.Tensor(gt_boxes), torch.tensor(gt_labels)
+        gt_boxes, gt_labels, gt_instance_ids = results['ann_infos']
+        #Hamdle weird case of tracker code thingie where instance ids are strings when runnign detection config
+        if len(gt_instance_ids) > 0 and type(gt_instance_ids[0]) == str:
+            gt_instance_ids = [int(str(str_id)[:12], 16) for str_id in gt_instance_ids]
+        gt_boxes, gt_labels, gt_instance_ids = torch.Tensor(np.array(gt_boxes)), torch.tensor(np.array(gt_labels)), torch.Tensor(np.array(gt_instance_ids))
+        if 'reference' in results:
+            # then we are doing QD tracking
+            gt_boxes_ref, gt_labels_ref, gt_instance_ids_ref = results['reference'][0]['ann_infos']
+            gt_boxes_ref, gt_labels_ref, gt_instance_ids_ref = torch.Tensor(np.array(gt_boxes_ref)), torch.tensor(np.array(gt_labels_ref)), torch.Tensor(np.array(gt_instance_ids_ref))
+
+            results['gt_match_indices'] = results['curr']['match_indices']
+            results['instance_ids_key'] = results['curr']['instance_ids']
+            results['instance_ids_ref'] = results['reference'][0]['instance_ids']
+
         rotate_bda, scale_bda, flip_dx, flip_dy = self.sample_bda_augmentation(
         )
         bda_mat = torch.zeros(4, 4)
         bda_mat[3, 3] = 1
         gt_boxes, bda_rot = self.bev_transform(gt_boxes, rotate_bda, scale_bda,
                                                flip_dx, flip_dy)
+        if 'reference' in results:
+            # then we are doing QD tracking
+            gt_boxes_ref, bda_rot_ref = self.bev_transform(gt_boxes_ref, rotate_bda, scale_bda,
+                                               flip_dx, flip_dy)
+
         bda_mat[:3, :3] = bda_rot
         if len(gt_boxes) == 0:
             gt_boxes = torch.zeros(0, 9)
+        if 'reference' in results:
+            # then we are doing QD tracking
+            if len(gt_boxes_ref) == 0:
+                gt_boxes_ref = torch.zeros(0, 9)
+
         results['gt_bboxes_3d'] = \
             LiDARInstance3DBoxes(gt_boxes, box_dim=gt_boxes.shape[-1],
                                  origin=(0.5, 0.5, 0.5))
+        
         results['gt_labels_3d'] = gt_labels
+        if 'reference' in results:
+            # then we are doing QD tracking
+            results['gt_bboxes_3d_ref'] = \
+                LiDARInstance3DBoxes(gt_boxes_ref, box_dim=gt_boxes_ref.shape[-1],
+                                     origin=(0.5, 0.5, 0.5))
+            results['gt_labels_3d_ref'] = gt_labels_ref
+
+
         imgs, rots, trans, intrins = results['img_inputs'][:4]
         post_rots, post_trans = results['img_inputs'][4:]
         results['img_inputs'] = (imgs, rots, trans, intrins, post_rots,

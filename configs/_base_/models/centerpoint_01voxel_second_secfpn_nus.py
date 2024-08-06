@@ -3,10 +3,10 @@ model = dict(
     type='CenterPoint',
     pts_voxel_layer=dict(
         max_num_points=10, voxel_size=voxel_size, max_voxels=(90000, 120000)),
-    pts_voxel_encoder=dict(type='HardSimpleVFE', num_features=5),
+    pts_voxel_encoder=dict(type='HardSimpleVFE', num_features=4),
     pts_middle_encoder=dict(
         type='SparseEncoder',
-        in_channels=5,
+        in_channels=4,
         sparse_shape=[41, 1024, 1024],
         output_channels=128,
         order=('conv', 'norm', 'act'),

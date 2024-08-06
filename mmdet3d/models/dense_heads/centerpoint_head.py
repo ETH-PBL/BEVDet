@@ -667,7 +667,7 @@ class CenterHead(BaseModule):
 
         return loss_dict
 
-    def get_bboxes(self, preds_dicts, img_metas, img=None, rescale=False):
+    def get_bboxes(self, preds_dicts, img_metas, img=None, rescale=False, do_nms=True):
         """Generate bboxes from bbox head predictions.
 
         Args:
@@ -706,6 +706,7 @@ class CenterHead(BaseModule):
                 batch_vel,
                 reg=batch_reg,
                 task_id=task_id)
+            
             batch_reg_preds = [box['bboxes'] for box in temp]
             batch_cls_preds = [box['scores'] for box in temp]
             batch_cls_labels = [box['labels'] for box in temp]
@@ -738,7 +739,7 @@ class CenterHead(BaseModule):
                 rets.append(
                     self.get_task_detections(batch_cls_preds, batch_reg_preds,
                                              batch_cls_labels, img_metas,
-                                             task_id))
+                                             task_id, do_nms=do_nms))
 
         # Merge branches results
         num_samples = len(rets[0])
@@ -748,7 +749,8 @@ class CenterHead(BaseModule):
             for k in rets[0][i].keys():
                 if k == 'bboxes':
                     bboxes = torch.cat([ret[i][k] for ret in rets])
-                    bboxes[:, 2] = bboxes[:, 2] - bboxes[:, 5] * 0.5
+                    #THIS HERE IS TO MAKE THE Z STICK TO THE FLOOR IF UNCOMMENTED
+                    #bboxes[:, 2] = bboxes[:, 2] - bboxes[:, 5] * 0.5
                     bboxes = img_metas[i]['box_type_3d'](
                         bboxes, self.bbox_coder.code_size)
                 elif k == 'scores':
@@ -764,7 +766,7 @@ class CenterHead(BaseModule):
 
     def get_task_detections(self, batch_cls_preds,
                             batch_reg_preds, batch_cls_labels, img_metas,
-                            task_id):
+                            task_id, do_nms=True):
         """Rotate nms for each task.
 
         Args:
@@ -805,20 +807,23 @@ class CenterHead(BaseModule):
                 else cls_preds
 
             if top_scores.shape[0] != 0:
-                boxes_for_nms = img_metas[i]['box_type_3d'](
-                    box_preds[:, :], self.bbox_coder.code_size).bev
-                # the nms in 3d detection just remove overlap boxes.
-                if isinstance(self.test_cfg['nms_thr'], list):
-                    nms_thresh = self.test_cfg['nms_thr'][task_id]
+                if do_nms:
+                    boxes_for_nms = img_metas[i]['box_type_3d'](
+                        box_preds[:, :], self.bbox_coder.code_size).bev
+                    # the nms in 3d detection just remove overlap boxes.
+                    if isinstance(self.test_cfg['nms_thr'], list):
+                        nms_thresh = self.test_cfg['nms_thr'][task_id]
+                    else:
+                        nms_thresh = self.test_cfg['nms_thr']
+                    selected = nms_bev(
+                        boxes_for_nms,
+                        top_scores,
+                        thresh=nms_thresh,
+                        pre_max_size=self.test_cfg['pre_max_size'],
+                        post_max_size=self.test_cfg['post_max_size'],
+                        xyxyr2xywhr=False)
                 else:
-                    nms_thresh = self.test_cfg['nms_thr']
-                selected = nms_bev(
-                    boxes_for_nms,
-                    top_scores,
-                    thresh=nms_thresh,
-                    pre_max_size=self.test_cfg['pre_max_size'],
-                    post_max_size=self.test_cfg['post_max_size'],
-                    xyxyr2xywhr=False)
+                    selected = torch.arange(box_preds.shape[0])
             else:
                 selected = []
 

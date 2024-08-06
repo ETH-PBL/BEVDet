@@ -198,6 +198,7 @@ model = dict(
 # Data
 dataset_type = 'NuScenesDataset'
 data_root = 'data/nuscenes/'
+data_root_pkl = 'data/nuscenes/'
 file_client_args = dict(backend='disk')
 
 bda_aug_conf = dict(
@@ -275,16 +276,16 @@ share_data_config = dict(
 
 test_data_config = dict(
     pipeline=test_pipeline,
-    ann_file=data_root + 'bevdetv2-nuscenes_infos_val.pkl')
+    ann_file=data_root_pkl + 'bevdetv2-nuscenes_infos_val.pkl')
 
 data = dict(
-    samples_per_gpu=8,
+    samples_per_gpu=4,
     workers_per_gpu=4,
     train=dict(
         type='CBGSDataset',
         dataset=dict(
         data_root=data_root,
-        ann_file=data_root + 'bevdetv2-nuscenes_infos_train.pkl',
+        ann_file=data_root_pkl + 'bevdetv2-nuscenes_infos_train.pkl',
         pipeline=train_pipeline,
         classes=class_names,
         test_mode=False,
@@ -322,4 +323,6 @@ custom_hooks = [
     ),
 ]
 
+evaluation = dict(interval=1)
+checkpoint_config = dict(interval=1)
 # fp16 = dict(loss_scale='dynamic')
